@@ -314,34 +314,107 @@ function ReportTypeTabs({ currentReportType, setCurrentReportType }) {
   ];
 
   return (
-    <div className="report-type-tabs mb-4">
-      <div className="container-fluid">
-        <div className="row justify-content-center">
-          <div className="col-12 col-md-8">
-            <div className="card shadow-sm border-0" style={{ borderRadius: '1rem' }}>
-              <div className="card-body p-3">
-                <div className="d-flex justify-content-center">
-                  <div className="btn-group" role="group" aria-label="Report type selection">
-                    {reportTypes.map((type) => (
-                      <button
-                        key={type.key}
-                        type="button"
-                        className={`btn ${currentReportType === type.key ? 'btn-primary' : 'btn-outline-primary'} px-4 py-2`}
-                        onClick={() => setCurrentReportType(type.key)}
-                        style={{ borderRadius: '0.5rem', marginRight: '2px' }}
-                      >
-                        <span className="me-2">{type.icon}</span>
-                        {type.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+    <div className="report-type-tabs mb-2">
+  <div className="container-fluid">
+    <div className="row justify-content-center">
+      <div className="col-12 col-md-8">
+        <div className="card shadow-sm border-0" style={{ borderRadius: '1rem' }}>
+          <div className="card-body p-3">
+            <div className="d-flex justify-content-center">
+              <div className="btn-group" role="group" aria-label="Report type selection">
+                {reportTypes.map((type) => (
+                  <button
+                    key={type.key}
+                    type="button"
+                    className={`btn ${currentReportType === type.key ? 'btn-primary' : 'btn-outline-primary'} px-4 py-2`}
+                    onClick={() => setCurrentReportType(type.key)}
+                    style={{ borderRadius: '0.5rem', marginRight: '2px' }}
+                  >
+                    <span className="me-2">{type.icon}</span>
+                    {type.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+  </div>
+
+  <style jsx>{`
+    /* Mobile responsive styles */
+    @media (max-width: 768px) {
+      .col-md-8 {
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+      
+      .card-body {
+        padding: 0.75rem !important;
+      }
+      
+      .btn-group .btn {
+        flex: 1;
+        padding: 0.5rem 0.75rem !important;
+        font-size: 14px;
+        min-width: 0;
+      }
+      
+      .btn-group .btn span.me-2 {
+        margin-right: 0.25rem !important;
+      }
+    }
+
+    @media (max-width: 576px) {
+      .container-fluid {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+      }
+      
+      .card-body {
+        padding: 0.5rem !important;
+      }
+      
+      .btn-group .btn {
+        padding: 0.4rem 0.5rem !important;
+        font-size: 13px;
+        margin-right: 1px !important;
+      }
+      
+      .btn-group .btn span {
+        font-size: 12px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .btn-group .btn {
+        padding: 0.35rem 0.4rem !important;
+        font-size: 12px;
+      }
+      
+      .btn-group .btn span.me-2 {
+        margin-right: 0.15rem !important;
+        font-size: 14px;
+      }
+      
+      .btn-group .btn span:not(.me-2) {
+        font-size: 11px;
+      }
+    }
+
+    /* Ensure buttons stay in a row and distribute evenly */
+    .btn-group {
+      width: 100%;
+      max-width: 500px;
+    }
+    
+    .btn-group .btn {
+      flex: 1;
+      white-space: nowrap;
+    }
+  `}</style>
+</div>
   );
 }
 
@@ -660,7 +733,7 @@ function AppContent() {
 
       <SummarySection records={filteredRecords} reportType={reportType} />
 
-      <ExportSection records={filteredRecords} reportType={reportType} />
+      {/* <ExportSection records={filteredRecords} reportType={reportType} /> */}
     </div>
   );
 }

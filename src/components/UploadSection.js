@@ -759,45 +759,185 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
   };
 
   return (
-    <div className="upload-section">
-      <div className="upload-controls">
+  <div style={{
+    padding: '20px',
+    maxWidth: '100%',
+    margin: '20px auto',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '8px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+  }}>
+    {/* Main Grid Container */}
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : 'repeat(3, 1fr)',
+      gap: '20px',
+      alignItems: 'start'
+    }}>
 
-        {/* Date Range Section */}
-        <div className="date-range-section">
-          <h3>{getDateRangeLabel()}</h3>
-          <div className="date-inputs">
-            <div className="date-input-group">
-              <label htmlFor="start-date">Start Date:</label>
-              <input
-                id="start-date"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-            <div className="date-input-group">
-              <label htmlFor="end-date">End Date:</label>
-              <input
-                id="end-date"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
+      {/* Date Range Section - Grid Item 1 */}
+      <div style={{
+        backgroundColor: 'white',
+        padding: '20px',
+        borderRadius: '8px',
+        border: '1px solid #e9ecef',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+      }}>
+        <h3 style={{
+          margin: '0 0 16px 0',
+          fontSize: '16px',
+          fontWeight: '600',
+          color: '#333',
+          borderBottom: '2px solid #007bff',
+          paddingBottom: '8px'
+        }}>
+          📅 {getDateRangeLabel()}
+        </h3>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px'
+          }}>
+            <label 
+              htmlFor="start-date"
+              style={{
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#555',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}
+            >
+              Start Date
+            </label>
+            <input
+              id="start-date"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              disabled={isLoading}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '2px solid #e9ecef',
+                borderRadius: '6px',
+                fontSize: '14px',
+                backgroundColor: isLoading ? '#f8f9fa' : 'white',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                boxSizing: 'border-box',
+                transition: 'border-color 0.2s ease',
+                outline: 'none'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#007bff'}
+              onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
+            />
+          </div>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px'
+          }}>
+            <label 
+              htmlFor="end-date"
+              style={{
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#555',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}
+            >
+              End Date
+            </label>
+            <input
+              id="end-date"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              disabled={isLoading}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '2px solid #e9ecef',
+                borderRadius: '6px',
+                fontSize: '14px',
+                backgroundColor: isLoading ? '#f8f9fa' : 'white',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                boxSizing: 'border-box',
+                transition: 'border-color 0.2s ease',
+                outline: 'none'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#007bff'}
+              onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
+            />
           </div>
         </div>
+      </div>
 
-        {/* Platform Section */}
-        <div className="platform-section">
-          <div className="platform-selection">
-            <label htmlFor="platform-select">Platform:</label>
+      {/* Platform Section - Grid Item 2 */}
+      <div style={{
+        backgroundColor: 'white',
+        padding: '20px',
+        borderRadius: '8px',
+        border: '1px solid #e9ecef',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+      }}>
+        <h3 style={{
+          margin: '0 0 16px 0',
+          fontSize: '16px',
+          fontWeight: '600',
+          color: '#333',
+          borderBottom: '2px solid #28a745',
+          paddingBottom: '8px'
+        }}>
+          🏪 Platform Settings
+        </h3>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px'
+          }}>
+            <label 
+              htmlFor="platform-select"
+              style={{
+                fontSize: '13px',
+                fontWeight: '500',
+                color: '#555',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}
+            >
+              Platform
+            </label>
             <select
               id="platform-select"
               value={platform}
               onChange={(e) => setPlatform(e.target.value)}
               disabled={isLoading}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '2px solid #e9ecef',
+                borderRadius: '6px',
+                fontSize: '14px',
+                backgroundColor: isLoading ? '#f8f9fa' : 'white',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                boxSizing: 'border-box',
+                transition: 'border-color 0.2s ease',
+                outline: 'none'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#28a745'}
+              onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
             >
               <option value="myntra">Myntra</option>
               <option value="nykaa">Nykaa</option>
@@ -810,13 +950,44 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
 
           {/* Myntra Specific Report Type */}
           {platform === 'myntra' && (reportType === 'orders' || reportType === 'returns') && (
-            <div className="myntra-report-type">
-              <label htmlFor="myntra-type-select">Myntra Report Type:</label>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              paddingTop: '12px',
+              borderTop: '1px solid #eee'
+            }}>
+              <label 
+                htmlFor="myntra-type-select"
+                style={{
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  color: '#555',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                Myntra Report Type
+              </label>
               <select
                 id="myntra-type-select"
                 value={myntraReportType}
                 onChange={(e) => setMyntraReportType(e.target.value)}
                 disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '2px solid #e9ecef',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: isLoading ? '#f8f9fa' : 'white',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.2s ease',
+                  outline: 'none'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#28a745'}
+                onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
               >
                 <option value="">Select Report Type</option>
                 <option value="sjit">SJIT</option>
@@ -826,56 +997,182 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
             </div>
           )}
         </div>
+      </div>
 
-        {/* File Upload Section */}
-        <div className="file-upload-section">
-          <div className="file-input-container">
-            <input
-              type="file"
-              accept=".csv,.xlsx,.xls,.json"
-              onChange={handleFileUpload}
-              disabled={isUploadDisabled()}
-              className="file-input"
-              id="file-upload"
-            />
-            <button
-              onClick={() => document.getElementById('file-upload').click()}
-              disabled={isUploadDisabled()}
-              className="upload-btn"
-            >
-              {isLoading ? (
-                <>
-                  <i className="fas fa-spinner fa-spin me-2"></i>
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <i className="fas fa-cloud-upload-alt me-2"></i>
-                  Choose File
-                </>
-              )}
-            </button>
-          </div>
+      {/* File Upload Section - Grid Item 3 */}
+      <div style={{
+        backgroundColor: 'white',
+        padding: '20px',
+        borderRadius: '8px',
+        border: '1px solid #e9ecef',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+      }}>
+        <h3 style={{
+          margin: '0 0 16px 0',
+          fontSize: '16px',
+          fontWeight: '600',
+          color: '#333',
+          borderBottom: '2px solid #dc3545',
+          paddingBottom: '8px'
+        }}>
+          📁 File Upload
+        </h3>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px'
+        }}>
+          <input
+            type="file"
+            accept=".csv,.xlsx,.xls,.json"
+            onChange={handleFileUpload}
+            disabled={isUploadDisabled()}
+            id="file-upload"
+            style={{ display: 'none' }}
+          />
+          <button
+            onClick={() => document.getElementById('file-upload').click()}
+            disabled={isUploadDisabled()}
+            style={{
+              width: '100%',
+              padding: '14px 20px',
+              backgroundColor: isUploadDisabled() ? '#6c757d' : '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: isUploadDisabled() ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              transition: 'all 0.2s ease',
+              boxSizing: 'border-box',
+              minHeight: '50px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              boxShadow: isUploadDisabled() ? 'none' : '0 2px 4px rgba(220,53,69,0.2)'
+            }}
+            onMouseOver={(e) => {
+              if (!isUploadDisabled()) {
+                e.target.style.backgroundColor = '#c82333';
+                e.target.style.transform = 'translateY(-1px)';
+                e.target.style.boxShadow = '0 4px 8px rgba(220,53,69,0.3)';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (!isUploadDisabled()) {
+                e.target.style.backgroundColor = '#dc3545';
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 2px 4px rgba(220,53,69,0.2)';
+              }
+            }}
+          >
+            {isLoading ? (
+              <>
+                <div style={{
+                  width: '18px',
+                  height: '18px',
+                  border: '2px solid transparent',
+                  borderTop: '2px solid white',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite'
+                }}></div>
+                Processing...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-cloud-upload-alt" style={{ fontSize: '16px' }}></i>
+                Choose File
+              </>
+            )}
+          </button>
 
           {/* Loading Indicator */}
           {isLoading && (
-            <div className="loading-indicator">
-              <div className="d-flex align-items-center">
-                <div className="spinner-border spinner-border-sm text-primary me-2" role="status">
-                  <span className="visually-hidden">Loading...</span>
-                </div>
-                <p className="mb-0">Processing file and saving to database...</p>
-              </div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '12px',
+              backgroundColor: '#fff3cd',
+              borderRadius: '6px',
+              border: '1px solid #ffeaa7'
+            }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: '2px solid #ffc107',
+                borderTop: '2px solid transparent',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }}></div>
+              <p style={{
+                margin: '0',
+                fontSize: '12px',
+                color: '#856404',
+                fontWeight: '500'
+              }}>
+                Processing file...
+              </p>
             </div>
           )}
         </div>
-
-      </div>
-      <div className="file-info">
-        <p><i className="fas fa-info-circle me-2"></i>{getFileInfoText()}</p>
       </div>
     </div>
-  );
+
+    {/* File Info - Full Width Below Grid */}
+    <div style={{
+      marginTop: '20px',
+      backgroundColor: '#d1ecf1',
+      padding: '16px 20px',
+      borderRadius: '8px',
+      border: '1px solid #bee5eb'
+    }}>
+      <p style={{
+        margin: '0',
+        fontSize: '14px',
+        color: '#0c5460',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '10px',
+        lineHeight: '1.5'
+      }}>
+        <i 
+          className="fas fa-info-circle" 
+          style={{ 
+            marginTop: '2px',
+            flexShrink: '0',
+            color: '#17a2b8',
+            fontSize: '16px'
+          }}
+        ></i>
+        <span style={{ 
+          wordBreak: 'break-word',
+          fontWeight: '500'
+        }}>
+          {getFileInfoText()}
+        </span>
+      </p>
+    </div>
+
+    {/* CSS Animation */}
+    <style jsx>{`
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      @media (max-width: 768px) {
+        .upload-section {
+          padding: 16px !important;
+        }
+      }
+    `}</style>
+  </div>
+);
 }
 
 export default UploadSection;
