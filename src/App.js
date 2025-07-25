@@ -11,8 +11,8 @@ import { DatabaseProvider, useDatabaseContext } from './contexts/DatabaseContext
 import './App.css';
 
 const PREDEFINED_CREDENTIALS = {
-  username: 'admin',
-  password: 'bani123'
+  username: 'BaniAdmin',
+  password: 'Bani@Ecom999'
 };
 
 function LoginScreen({ onLogin }) {
@@ -284,20 +284,6 @@ function LoginScreen({ onLogin }) {
               borderRadius: '0.75rem',
               border: '1px solid #e5e7eb'
             }}>
-              <small style={{ color: '#6b7280', fontSize: '0.8rem', lineHeight: '1.5' }}>
-                <strong style={{ color: '#4b5563' }}>Demo Credentials:</strong><br />
-                Username: <code style={{ 
-                  backgroundColor: '#e5e7eb', 
-                  padding: '0.125rem 0.25rem', 
-                  borderRadius: '0.25rem',
-                  fontSize: '0.75rem'
-                }}>admin</code> | Password: <code style={{ 
-                  backgroundColor: '#e5e7eb', 
-                  padding: '0.125rem 0.25rem', 
-                  borderRadius: '0.25rem',
-                  fontSize: '0.75rem'
-                }}>bani123</code>
-              </small>
             </div>
           </div>
         </div>
