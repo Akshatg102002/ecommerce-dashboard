@@ -98,23 +98,23 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
   // **NEW: Extract parent SKU from child SKU**
   const extractParentSku = (childSku) => {
     if (!childSku) return null;
-    
+
     // Remove size and color variants
     // Examples: BW8058Grey_SKD-L -> BW8058, BW8058Red-M -> BW8058, BW8058_L -> BW8058
     let parentSku = childSku.toString().trim();
-    
+
     // Remove common size suffixes
     parentSku = parentSku.replace(/[-_](XS|S|M|L|XL|XXL|XXXL|\d+)$/i, '');
-    
+
     // Remove color variants (common color names)
     parentSku = parentSku.replace(/(Black|White|Red|Blue|Green|Yellow|Pink|Purple|Orange|Brown|Grey|Gray|Navy|Maroon|Beige|Cream|Olive|Khaki|Burgundy|Teal|Coral|Mint|Lavender|Peach|Rose|Gold|Silver|Bronze)[-_]?/gi, '');
-    
+
     // Remove additional variant patterns
     parentSku = parentSku.replace(/[-_](SKD|Regular|Slim|Fit|Cotton|Polyester|Denim|Casual|Formal)[-_]?/gi, '');
-    
+
     // Remove trailing separators
     parentSku = parentSku.replace(/[-_]+$/, '');
-    
+
     return parentSku || childSku;
   };
 
@@ -126,7 +126,7 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
 
     const mappingKey = `${platform}_${platformSku.toLowerCase()}`;
     const mappingData = skuMapping.get(mappingKey);
-    
+
     if (mappingData) {
       return {
         localSku: mappingData.localSku,
@@ -134,7 +134,7 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
         originalSku: platformSku
       };
     }
-    
+
     return { localSku: platformSku, category: '', originalSku: platformSku };
   };
 
@@ -156,12 +156,12 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
   const processHierarchicalData = () => {
     const parentSkuData = {};
     const childSkuData = {};
-    
+
     filteredRecords.forEach(record => {
       if (!record) return;
-      
+
       const platform = record.platform || 'unknown';
-      
+
       // Process different data types based on report type
       let skuDataSource = null;
       if (reportType === 'orders' && record.skuSales) {
@@ -173,15 +173,15 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
       } else if (record.skus) {
         skuDataSource = record.skus;
       }
-      
+
       if (skuDataSource && typeof skuDataSource === 'object') {
         Object.entries(skuDataSource).forEach(([childSku, value]) => {
           if (!childSku || !value) return;
-          
+
           const mapping = getLocalSkuMapping(childSku, platform.toLowerCase());
           const mappedChildSku = mapping.localSku;
           const parentSku = extractParentSku(mappedChildSku);
-          
+
           // Store parent SKU data
           if (!parentSkuData[parentSku]) {
             parentSkuData[parentSku] = {
@@ -194,7 +194,7 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
           parentSkuData[parentSku].value += parseFloat(value) || 0;
           parentSkuData[parentSku].count += 1;
           parentSkuData[parentSku].children.add(mappedChildSku);
-          
+
           // Store child SKU data
           if (!childSkuData[parentSku]) {
             childSkuData[parentSku] = {};
@@ -212,24 +212,24 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
         });
       }
     });
-    
+
     return { parentSkuData, childSkuData };
   };
 
   // **NEW: Handle chart click for drill-down**
   const handleChartClick = (event, elements, chartType) => {
     if (chartType !== 'skus') return; // Only handle SKU chart clicks
-    
+
     if (elements.length > 0) {
       const elementIndex = elements[0].index;
-      
+
       if (drilldownLevel === 'parent') {
         // Drill down to child SKUs
         const hierarchicalData = processHierarchicalData();
         const parentSkus = Object.entries(hierarchicalData.parentSkuData)
           .sort((a, b) => b[1].value - a[1].value)
           .slice(0, 10);
-        
+
         if (parentSkus[elementIndex]) {
           const clickedParentSku = parentSkus[elementIndex][0];
           setSelectedParentSku(clickedParentSku);
@@ -249,7 +249,7 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
     const platformDistribution = {};
     const warehouseDistribution = {};
     const topCategories = {};
-    
+
     // Process hierarchical SKU data
     const hierarchicalData = processHierarchicalData();
     const { parentSkuData, childSkuData } = hierarchicalData;
@@ -305,13 +305,13 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
 
     // **NEW: Generate SKU chart data based on drill-down level**
     let topSkus = { labels: [], data: [] };
-    
+
     if (drilldownLevel === 'parent') {
       // Show parent SKUs
       const sortedParentSkus = Object.entries(parentSkuData)
         .sort((a, b) => b[1].value - a[1].value)
         .slice(0, 10);
-      
+
       topSkus = {
         labels: sortedParentSkus.map(([parentSku]) => parentSku),
         data: sortedParentSkus.map(([_, data]) => data.value)
@@ -322,7 +322,7 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
       const sortedChildSkus = Object.entries(childSkus)
         .sort((a, b) => b[1].value - a[1].value)
         .slice(0, 10);
-      
+
       topSkus = {
         labels: sortedChildSkus.map(([childSku]) => childSku),
         data: sortedChildSkus.map(([_, data]) => data.value)
@@ -441,14 +441,14 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
   // **NEW: Enhanced chart title with drill-down indication**
   const getChartTitle = (chartType) => {
     const platformFilter = selectedPlatform !== 'all' ? ` - ${selectedPlatform.toUpperCase()}` : '';
-    
+
     if (chartType === 'skus') {
       let baseTitle = '';
       if (reportType === 'orders') baseTitle = 'Top Selling SKUs';
       else if (reportType === 'returns') baseTitle = 'Top Returned SKUs';
       else if (reportType === 'inventory') baseTitle = 'Top Stock SKUs';
       else baseTitle = 'Top SKUs';
-      
+
       if (drilldownLevel === 'parent') {
         return `${baseTitle} - Parent SKUs${platformFilter}`;
       } else if (drilldownLevel === 'child' && selectedParentSku) {
@@ -456,7 +456,7 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
       }
       return `${baseTitle}${platformFilter}`;
     }
-    
+
     switch (chartType) {
       case 'trends':
         return `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Trends${platformFilter}`;
@@ -493,8 +493,8 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
       data: {
         labels: chartData.trends.labels,
         datasets: [{
-          label: reportType === 'inventory' ? 'Stock Units' : 
-                 reportType === 'orders' ? 'Sales Amount' : 'Return Count',
+          label: reportType === 'inventory' ? 'Stock Units' :
+            reportType === 'orders' ? 'Sales Amount' : 'Return Count',
           data: chartData.trends.historicalData,
           borderColor: '#3B82F6',
           backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -628,16 +628,16 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
       data: {
         labels: chartData.topSkus.labels,
         datasets: [{
-          label: reportType === 'orders' ? 'Sales Amount' : 
-                 reportType === 'returns' ? 'Return Count' : 'Stock Quantity',
+          label: reportType === 'orders' ? 'Sales Amount' :
+            reportType === 'returns' ? 'Return Count' : 'Stock Quantity',
           data: chartData.topSkus.data,
-          backgroundColor: drilldownLevel === 'parent' ? 
+          backgroundColor: drilldownLevel === 'parent' ?
             'rgba(139, 92, 246, 0.8)' : 'rgba(16, 185, 129, 0.8)',
           borderColor: drilldownLevel === 'parent' ? '#8B5CF6' : '#10B981',
           borderWidth: 2,
           borderRadius: 8,
           borderSkipped: false,
-          hoverBackgroundColor: drilldownLevel === 'parent' ? 
+          hoverBackgroundColor: drilldownLevel === 'parent' ?
             'rgba(139, 92, 246, 0.9)' : 'rgba(16, 185, 129, 0.9)',
           hoverBorderWidth: 3
         }]
@@ -661,14 +661,14 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
                 } else if (reportType === 'inventory') {
                   label = `Stock: ${value.toLocaleString('en-IN')} units`;
                 }
-                
+
                 // Add drill-down hint
                 if (drilldownLevel === 'parent') {
                   label += ' (Click to view variants)';
                 } else {
                   label += ' (Click to go back)';
                 }
-                
+
                 return label;
               }
             }
@@ -679,8 +679,8 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
             ...commonOptions.scales.x,
             title: {
               display: true,
-              text: reportType === 'orders' ? 'Sales Amount (₹)' : 
-                    reportType === 'returns' ? 'Return Count' : 'Stock Units',
+              text: reportType === 'orders' ? 'Sales Amount (₹)' :
+                reportType === 'returns' ? 'Return Count' : 'Stock Units',
               color: '#374151',
               font: {
                 size: 13,
@@ -703,7 +703,7 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
             },
             ticks: {
               ...commonOptions.scales.y.ticks,
-              callback: function(value, index, ticks) {
+              callback: function (value, index, ticks) {
                 const label = this.getLabelForValue(value);
                 return label.length > 25 ? label.substring(0, 25) + '...' : label;
               }
@@ -720,8 +720,8 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
       data: {
         labels: chartData.topCategories.labels,
         datasets: [{
-          label: reportType === 'orders' ? 'Sales Amount' : 
-                 reportType === 'returns' ? 'Return Value' : 'Stock Quantity',
+          label: reportType === 'orders' ? 'Sales Amount' :
+            reportType === 'returns' ? 'Return Value' : 'Stock Quantity',
           data: chartData.topCategories.data,
           backgroundColor: 'rgba(16, 185, 129, 0.8)',
           borderColor: '#10B981',
@@ -749,8 +749,8 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
             ...commonOptions.scales.x,
             title: {
               display: true,
-              text: reportType === 'orders' ? 'Sales Amount (₹)' : 
-                    reportType === 'returns' ? 'Return Value (₹)' : 'Stock Units',
+              text: reportType === 'orders' ? 'Sales Amount (₹)' :
+                reportType === 'returns' ? 'Return Value (₹)' : 'Stock Units',
               color: '#374151',
               font: {
                 size: 13,
@@ -778,9 +778,9 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
   ];
 
   const renderChart = (chart, index) => {
-    const ChartComponent = chart.type === 'line' ? Line : 
-                          chart.type === 'doughnut' ? Doughnut : Bar;
-    
+    const ChartComponent = chart.type === 'line' ? Line :
+      chart.type === 'doughnut' ? Doughnut : Bar;
+
     return (
       <div key={index} className="chart-container">
         <div className="chart-header">
@@ -788,7 +788,7 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
           {chart.chartType === 'skus' && (
             <div className="chart-controls">
               {drilldownLevel === 'child' && (
-                <button 
+                <button
                   className="back-button"
                   onClick={() => {
                     setSelectedParentSku(null);
@@ -822,10 +822,10 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
   return (
     <div className="charts-section">
       <div className="charts-header">
-        <h2>Analytics Dashboard</h2>
+        <h2>Analytics Charts</h2>
         <div className="charts-controls">
-          <select 
-            value={selectedPlatform} 
+          <select
+            value={selectedPlatform}
             onChange={(e) => setSelectedPlatform(e.target.value)}
             className="platform-select"
           >
@@ -862,4 +862,3 @@ const ChartsSection = ({ records, reportType, skuMapping: propSkuMapping = {} })
 };
 
 export default ChartsSection;
-  

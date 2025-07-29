@@ -7,6 +7,7 @@ import ChartsSection from './components/ChartsSection';
 import ExportSection from './components/ExportSection';
 import DateRangeFilter from './components/DateRangeFilter';
 import AIInsightsSection from './components/AIInsightsSection';
+import Projections from './components/Projections';
 import { DatabaseProvider, useDatabaseContext } from './contexts/DatabaseContext';
 import './App.css';
 
@@ -37,12 +38,12 @@ function LoginScreen({ onLogin }) {
         loginTime: new Date().toISOString(),
         sessionId: 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
       };
-      
+
       onLogin(loginData);
     } else {
       setError('Invalid username or password');
     }
-    
+
     setIsLoading(false);
   };
 
@@ -109,8 +110,8 @@ function LoginScreen({ onLogin }) {
             }}>
               🏪
             </div>
-            <h2 style={{ 
-              color: '#1f2937', 
+            <h2 style={{
+              color: '#1f2937',
               marginBottom: '0.5rem',
               fontSize: '1.75rem',
               fontWeight: '700',
@@ -118,8 +119,8 @@ function LoginScreen({ onLogin }) {
             }}>
               Bani Women Dashboard
             </h2>
-            <p style={{ 
-              color: '#6b7280', 
+            <p style={{
+              color: '#6b7280',
               fontSize: '0.95rem',
               fontWeight: '400',
               margin: 0
@@ -130,8 +131,8 @@ function LoginScreen({ onLogin }) {
 
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
-              <label htmlFor="username" className="form-label" style={{ 
-                color: '#374151', 
+              <label htmlFor="username" className="form-label" style={{
+                color: '#374151',
                 fontWeight: '600',
                 fontSize: '0.875rem',
                 marginBottom: '0.5rem',
@@ -172,8 +173,8 @@ function LoginScreen({ onLogin }) {
             </div>
 
             <div className="mb-4">
-              <label htmlFor="password" className="form-label" style={{ 
-                color: '#374151', 
+              <label htmlFor="password" className="form-label" style={{
+                color: '#374151',
                 fontWeight: '600',
                 fontSize: '0.875rem',
                 marginBottom: '0.5rem',
@@ -239,8 +240,8 @@ function LoginScreen({ onLogin }) {
                 padding: '0.875rem 1rem',
                 fontSize: '1rem',
                 fontWeight: '600',
-                background: isLoading 
-                  ? '#9ca3af' 
+                background: isLoading
+                  ? '#9ca3af'
                   : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 border: 'none',
                 color: 'white',
@@ -301,34 +302,34 @@ function ReportTypeTabs({ currentReportType, setCurrentReportType }) {
 
   return (
     <div className="report-type-tabs mb-2">
-  <div className="container-fluid">
-    <div className="row justify-content-center">
-      <div className="col-12 col-md-8">
-        <div className="card shadow-sm border-0" style={{ borderRadius: '1rem' }}>
-          <div className="card-body p-3">
-            <div className="d-flex justify-content-center">
-              <div className="btn-group" role="group" aria-label="Report type selection">
-                {reportTypes.map((type) => (
-                  <button
-                    key={type.key}
-                    type="button"
-                    className={`btn ${currentReportType === type.key ? 'btn-primary' : 'btn-outline-primary'} px-4 py-2`}
-                    onClick={() => setCurrentReportType(type.key)}
-                    style={{ borderRadius: '0.5rem', marginRight: '2px' }}
-                  >
-                    <span className="me-2">{type.icon}</span>
-                    {type.label}
-                  </button>
-                ))}
+      <div className="container-fluid">
+        <div className="row justify-content-center">
+          <div className="col-12 col-md-8">
+            <div className="card shadow-sm border-0" style={{ borderRadius: '1rem' }}>
+              <div className="card-body p-3">
+                <div className="d-flex justify-content-center">
+                  <div className="btn-group" role="group" aria-label="Report type selection">
+                    {reportTypes.map((type) => (
+                      <button
+                        key={type.key}
+                        type="button"
+                        className={`btn ${currentReportType === type.key ? 'btn-primary' : 'btn-outline-primary'} px-4 py-2`}
+                        onClick={() => setCurrentReportType(type.key)}
+                        style={{ borderRadius: '0.5rem', marginRight: '2px' }}
+                      >
+                        <span className="me-2">{type.icon}</span>
+                        {type.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <style jsx>{`
+      <style jsx>{`
     /* Mobile responsive styles */
     @media (max-width: 768px) {
       .col-md-8 {
@@ -400,7 +401,7 @@ function ReportTypeTabs({ currentReportType, setCurrentReportType }) {
       white-space: nowrap;
     }
   `}</style>
-</div>
+    </div>
   );
 }
 
@@ -419,16 +420,16 @@ function AppContent() {
   const currentRecords = allRecords[reportType] || [];
 
   // Filter records based on date filter
-  const filteredRecords = dateFilter.isActive 
+  const filteredRecords = dateFilter.isActive
     ? currentRecords.filter(record => {
-        const recordDate = record.startDate || 
-                          record.endDate || 
-                          record.uploadedAt?.split('T')[0] || 
-                          (record.date ? new Date(record.date).toISOString().split('T')[0] : null);
+      const recordDate = record.startDate ||
+        record.endDate ||
+        record.uploadedAt?.split('T')[0] ||
+        (record.date ? new Date(record.date).toISOString().split('T')[0] : null);
 
-        if (!recordDate || recordDate === 'Invalid Date') return false;
-        return recordDate >= dateFilter.startDate && recordDate <= dateFilter.endDate;
-      })
+      if (!recordDate || recordDate === 'Invalid Date') return false;
+      return recordDate >= dateFilter.startDate && recordDate <= dateFilter.endDate;
+    })
     : currentRecords;
 
   useEffect(() => {
@@ -538,7 +539,7 @@ function AppContent() {
 
   const handleLogout = async () => {
     const confirmLogout = window.confirm('Are you sure you want to logout?');
-    
+
     if (!confirmLogout) {
       return;
     }
@@ -548,22 +549,22 @@ function AppContent() {
       if (isDbReady && currentUser) {
         console.log('Logout - session cleared');
       }
-      
+
       // Clear localStorage
       localStorage.removeItem('dashboardAuth');
-      
+
       setCurrentUser(null);
-      
+
       // Clear all records on logout for security
       setAllRecords({
         orders: [],
         returns: [],
         inventory: []
       });
-      
+
       // This will trigger a re-render and show login screen
       window.location.reload();
-      
+
     } catch (error) {
       console.error('Error during logout:', error);
       // Still perform logout even if cleanup fails
@@ -575,77 +576,77 @@ function AppContent() {
   return (
     <div className="App">
       {/* Header without sticky positioning */}
-      <header          
-        className="dashboard-header"          
-        style={{            
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',           
-          color: 'white',           
-          padding: '1rem 2rem',           
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'         
-        }}       
-      >         
-        <div className="container-fluid">           
-          <div className="row align-items-center">             
-            <div className="col-12 col-lg-8">               
-              <h1 style={{                  
-                margin: 0,                  
-                fontSize: 'clamp(1.25rem, 4vw, 1.75rem)',                 
-                fontWeight: '700',                 
-                letterSpacing: '-0.025em',                 
-                textShadow: '0 2px 4px rgba(0,0,0,0.1)'               
-              }}>                 
-                🏪 Bani Women Multi-Platform Ecommerce Dashboard               
-              </h1>             
-            </div>             
-            <div className="col-12 col-lg-4 mt-2 mt-lg-0">               
-              <div className="d-flex align-items-center justify-content-lg-end">                 
-                <div className="user-info me-3" style={{                   
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',                   
-                  padding: '0.5rem 1rem',                   
-                  borderRadius: '2rem',                   
-                  backdropFilter: 'blur(10px)',                   
-                  border: '1px solid rgba(255, 255, 255, 0.2)'                 
-                }}>                   
-                  <span style={{                      
-                    fontSize: '0.875rem',                     
-                    fontWeight: '500',                     
-                    opacity: 0.9                   
-                  }}>                     
-                    👋 Welcome, <strong style={{ fontWeight: '700' }}>{currentUser?.username || 'User'}</strong>                   
-                  </span>                 
-                </div>                 
-                <button                    
-                  className="btn btn-light btn-sm"                   
-                  onClick={handleLogout}                   
-                  style={{                      
-                    borderRadius: '2rem',                     
-                    padding: '0.5rem 1rem',  
-                    marginTop: '1rem',                   
-                    fontWeight: '600',                     
-                    fontSize: '0.875rem',                     
-                    border: '2px solid rgba(255, 255, 255, 0.3)',                     
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)',                     
-                    color: '#4b5563',                     
-                    transition: 'all 0.2s ease',                     
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'                   
-                  }}                   
-                  onMouseEnter={(e) => {                     
-                    e.target.style.backgroundColor = '#ffffff';                     
-                    e.target.style.transform = 'translateY(-1px)';                     
-                    e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';                   
-                  }}                   
-                  onMouseLeave={(e) => {                     
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';                     
-                    e.target.style.transform = 'translateY(0)';                     
-                    e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';                   
-                  }}                 
-                >                   
-                  🚪 Logout                 
-                </button>               
-              </div>             
-            </div>           
-          </div>         
-        </div>       
+      <header
+        className="dashboard-header"
+        style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          padding: '1rem 2rem',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+        }}
+      >
+        <div className="container-fluid">
+          <div className="row align-items-center">
+            <div className="col-12 col-lg-8">
+              <h1 style={{
+                margin: 0,
+                fontSize: 'clamp(1.25rem, 4vw, 1.75rem)',
+                fontWeight: '700',
+                letterSpacing: '-0.025em',
+                textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}>
+                🏪 Bani Women Multi-Platform Ecommerce Dashboard
+              </h1>
+            </div>
+            <div className="col-12 col-lg-4 mt-2 mt-lg-0">
+              <div className="d-flex align-items-center justify-content-lg-end">
+                <div className="user-info me-3" style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '2rem',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)'
+                }}>
+                  <span style={{
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    opacity: 0.9
+                  }}>
+                    👋 Welcome, <strong style={{ fontWeight: '700' }}>{currentUser?.username || 'User'}</strong>
+                  </span>
+                </div>
+                <button
+                  className="btn btn-light btn-sm"
+                  onClick={handleLogout}
+                  style={{
+                    borderRadius: '2rem',
+                    padding: '0.5rem 1rem',
+                    marginTop: '1rem',
+                    fontWeight: '600',
+                    fontSize: '0.875rem',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    color: '#4b5563',
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = '#ffffff';
+                    e.target.style.transform = 'translateY(-1px)';
+                    e.target.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                  }}
+                >
+                  🚪 Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </header>
 
       {/* Report Type Tabs - normal flow */}
@@ -660,7 +661,7 @@ function AppContent() {
       <PlatformTabs reportType={reportType} setReportType={setReportType} />
 
       {/* Status Bar - normal flow */}
-      <div className="container-fluid mb-3">
+      {/* <div className="container-fluid mb-3">
         <div style={{
           backgroundColor: '#f8fafc',
           padding: '0.75rem 1rem',
@@ -695,7 +696,7 @@ function AppContent() {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Main Sections - all in normal document flow */}
       <UploadSection
@@ -710,14 +711,18 @@ function AppContent() {
         reportType={reportType}
       />
 
+      <SummarySection records={filteredRecords} reportType={reportType} />
+
+
       <ChartsSection records={filteredRecords} reportType={reportType} />
 
       {/* AI Insights Section - only show if we have records */}
-      {filteredRecords.length > 0 && (
+      {/* {filteredRecords.length > 0 && (
         <AIInsightsSection records={filteredRecords} reportType={reportType} />
-      )}
+      )} */}
 
-      <SummarySection records={filteredRecords} reportType={reportType} />
+      <Projections />
+
 
       {/* <ExportSection records={filteredRecords} reportType={reportType} /> */}
     </div>

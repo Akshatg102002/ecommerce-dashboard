@@ -1,81 +1,371 @@
-import React, { useState, useMemo } from 'react'
-import DateRangeFilter from './DateRangeFilter'
+import React, { useState, useMemo } from 'react';
+import DateRangeFilter from './DateRangeFilter';
 
-function SummarySection({ records, reportType }) {
-  const [filterRange, setFilterRange] = useState({ startDate: '', endDate: '', isActive: false })
-  const [groupBy, setGroupBy] = useState('platform')
-  const [skuSearchTerm, setSkuSearchTerm] = useState('')
+function SummarySection({ records = [], reportType = 'orders' }) {
+  const [filterRange, setFilterRange] = useState({ startDate: '', endDate: '', isActive: false });
+  const [skuSearchTerm, setSkuSearchTerm] = useState('');
+  const [activeYesterdayTab, setActiveYesterdayTab] = useState('yesterday');
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
+  
+  // SKU Mapping - Load from the same mapping system used in projections
+  const [skuMapping, setSkuMapping] = useState(new Map());
+  const [mappingLoaded, setMappingLoaded] = useState(false);
 
-  // formatting helpers
-  const formatCurrency = amount =>
-    `₹${Number(amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
-  const formatNumber = num => Number(num).toLocaleString('en-IN')
+  // Ensure records is always an array
+  const safeRecords = Array.isArray(records) ? records : [];
 
-  // receive date‐range selection
-  const handleFilterChange = range => setFilterRange(range)
+  // Load SKU mapping on component mount
+  React.useEffect(() => {
+    const loadSkuMapping = async () => {
+      try {
+        const response = await fetch('/Master_SKU_Mapping.csv');
+        if (!response.ok) {
+          console.warn('Master SKU mapping file not found. SKU mapping will be disabled.');
+          setMappingLoaded(true);
+          return;
+        }
 
-  // normalize record date for filtering
-  const getRecordDate = record => {
-    if (record.startDate) return record.startDate
-    if (record.endDate) return record.endDate
-    if (record.uploadedAt) return record.uploadedAt.split('T')[0]
-    if (record.date) return new Date(record.date).toISOString().split('T')[0]
-    return null
-  }
-
-  // apply date filter
-  const filteredRecords = useMemo(() => {
-    if (!filterRange.isActive) return records
-    return records.filter(record => {
-      const d = getRecordDate(record)
-      return d && d >= filterRange.startDate && d <= filterRange.endDate
-    })
-  }, [records, filterRange])
-
-  // aggregate by platform
-  const platformSummary = useMemo(() => {
-    return filteredRecords.reduce((acc, r) => {
-      const key = r.platform || 'Unknown'
-      if (!acc[key]) acc[key] = { orders: 0, sales: 0, returns: 0, refund: 0, stock: 0, recordCount: 0 }
-      acc[key].recordCount += 1
-      if (reportType === 'orders') {
-        acc[key].orders += r.totalOrders || 0
-        acc[key].sales += r.totalSales || 0
-      } else if (reportType === 'returns') {
-        acc[key].returns += r.totalReturns || 0
-        acc[key].refund += r.totalRefundAmount || 0
-      } else if (reportType === 'inventory') {
-        acc[key].stock += r.totalStock || 0
+        const csvText = await response.text();
+        const lines = csvText.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim());
+        
+        const mapping = new Map();
+        
+        for (let i = 1; i < lines.length; i++) {
+          const row = lines[i].split(',').map(cell => cell.trim());
+          if (row.length < headers.length) continue;
+          
+          const rowData = {};
+          headers.forEach((header, index) => {
+            rowData[header] = row[index] || '';
+          });
+          
+          const localSku = rowData['Local_SKU'] || rowData['Local SKU'] || rowData['local_sku'];
+          const myntraSku = rowData['Myntra_SKU'] || rowData['Myntra SKU'] || rowData['myntra_sku'];
+          const amazonSku = rowData['Amazon_SKU'] || rowData['Amazon SKU'] || rowData['amazon_sku'];
+          const flipkartSku = rowData['Flipkart_SKU'] || rowData['Flipkart SKU'] || rowData['flipkart_sku'];
+          const nykaaSku = rowData['Nykaa_SKU'] || rowData['Nykaa SKU'] || rowData['nykaa_sku'];
+          const ajioSku = rowData['Ajio_SKU'] || rowData['Ajio SKU'] || rowData['ajio_sku'];
+          const categories = rowData['Categories'] || rowData['categories'] || rowData['Category'];
+          
+          if (localSku) {
+            const mappingData = {
+              localSku: localSku,
+              categories: categories || '',
+              platforms: {}
+            };
+            
+            // Map all platform SKUs to the same local SKU
+            if (myntraSku) {
+              mappingData.platforms.myntra = myntraSku;
+              mapping.set(`myntra_${myntraSku.toLowerCase()}`, mappingData);
+            }
+            if (amazonSku) {
+              mappingData.platforms.amazon = amazonSku;
+              mapping.set(`amazon_${amazonSku.toLowerCase()}`, mappingData);
+            }
+            if (flipkartSku) {
+              mappingData.platforms.flipkart = flipkartSku;
+              mapping.set(`flipkart_${flipkartSku.toLowerCase()}`, mappingData);
+            }
+            if (nykaaSku) {
+              mappingData.platforms.nykaa = nykaaSku;
+              mapping.set(`nykaa_${nykaaSku.toLowerCase()}`, mappingData);
+            }
+            if (ajioSku) {
+              mappingData.platforms.ajio = ajioSku;
+              mapping.set(`ajio_${ajioSku.toLowerCase()}`, mappingData);
+            }
+            
+            // Also map the local SKU to itself
+            mapping.set(`local_${localSku.toLowerCase()}`, mappingData);
+            mapping.set(localSku.toLowerCase(), mappingData);
+          }
+        }
+        
+        setSkuMapping(mapping);
+        setMappingLoaded(true);
+        console.log(`✅ Loaded ${mapping.size} SKU mappings for Summary Section`);
+      } catch (error) {
+        console.error('Error loading SKU mapping:', error);
+        setMappingLoaded(true);
       }
-      return acc
-    }, {})
-  }, [filteredRecords, reportType])
+    };
 
-  // aggregate by SKU with search functionality
+    loadSkuMapping();
+  }, []);
+
+  // Enhanced SKU mapping helper function
+  const getLocalSkuMapping = (platformSku, platform) => {
+    if (!platformSku || !skuMapping.size) {
+      return { localSku: platformSku, category: '', originalSku: platformSku, mapped: false };
+    }
+    
+    // Try different mapping keys in order of specificity
+    const mappingKeys = [
+      `${platform}_${platformSku.toLowerCase()}`,
+      `local_${platformSku.toLowerCase()}`,
+      platformSku.toLowerCase()
+    ];
+    
+    for (const mappingKey of mappingKeys) {
+      const mappingData = skuMapping.get(mappingKey);
+      if (mappingData) {
+        return {
+          localSku: mappingData.localSku,
+          category: mappingData.categories,
+          originalSku: platformSku,
+          mapped: true
+        };
+      }
+    }
+    
+    // If no mapping found, return original SKU
+    return { localSku: platformSku, category: '', originalSku: platformSku, mapped: false };
+  };
+
+  // Formatting helpers
+  const formatCurrency = amount => `₹${Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  const formatNumber = num => Number(num || 0).toLocaleString('en-IN');
+
+  // Date handling
+  const handleFilterChange = range => setFilterRange(range);
+  
+  const getRecordDate = record => {
+    if (!record) return null;
+    if (record.startDate) return record.startDate;
+    if (record.endDate) return record.endDate;
+    if (record.uploadedAt) return record.uploadedAt.split('T')[0];
+    if (record.date) return new Date(record.date).toISOString().split('T')[0];
+    return null;
+  };
+
+  // Get yesterday's date
+  const getYesterdayDate = () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday.toISOString().split('T')[0];
+  };
+
+  // Get day before yesterday's date
+  const getDayBeforeYesterdayDate = () => {
+    const dayBefore = new Date();
+    dayBefore.setDate(dayBefore.getDate() - 2);
+    return dayBefore.toISOString().split('T')[0];
+  };
+
+  // Apply date filter
+  const filteredRecords = useMemo(() => {
+    if (!filterRange.isActive) return safeRecords;
+    return safeRecords.filter(record => {
+      const d = getRecordDate(record);
+      return d && d >= filterRange.startDate && d <= filterRange.endDate;
+    });
+  }, [safeRecords, filterRange]);
+
+  // Enhanced platform summary with Myntra PPMP/SJIT distribution
+  const platformSummary = useMemo(() => {
+    if (!Array.isArray(filteredRecords)) return {};
+    
+    return filteredRecords.reduce((acc, r) => {
+      if (!r) return acc;
+      
+      let key = r.platform || 'Unknown';
+      
+      // Special handling for Myntra - distribute by report type and business unit
+      if (key.toLowerCase() === 'myntra' && r.reportType) {
+        const businessUnit = r.businessUnit || r.source || 'PPMP';
+        key = `myntra_${businessUnit.toUpperCase()}_${r.reportType.toUpperCase()}`;
+      }
+      
+      if (!acc[key]) {
+        acc[key] = { 
+          orders: 0, 
+          sales: 0, 
+          returns: 0, 
+          refund: 0, 
+          stock: 0, 
+          recordCount: 0,
+          platform: r.platform,
+          businessUnit: r.businessUnit || 'PPMP',
+          reportType: r.reportType || reportType
+        };
+      }
+      
+      acc[key].recordCount += 1;
+      
+      if (reportType === 'orders') {
+        acc[key].orders += r.totalOrders || 0;
+        acc[key].sales += r.totalSales || 0;
+      } else if (reportType === 'returns') {
+        acc[key].returns += r.totalReturns || 0;
+        acc[key].refund += r.totalRefundAmount || 0;
+      } else if (reportType === 'inventory') {
+        acc[key].stock += r.totalStock || 0;
+      }
+      
+      return acc;
+    }, {});
+  }, [filteredRecords, reportType]);
+
+  // Yesterday's sales comparison - restructured for tabs
+  const yesterdayComparison = useMemo(() => {
+    const yesterdayDate = getYesterdayDate();
+    const dayBeforeDate = getDayBeforeYesterdayDate();
+    
+    if (!Array.isArray(safeRecords)) {
+      return { yesterday: {}, dayBefore: {} };
+    }
+    
+    const yesterdayRecords = safeRecords.filter(r => r && getRecordDate(r) === yesterdayDate);
+    const dayBeforeRecords = safeRecords.filter(r => r && getRecordDate(r) === dayBeforeDate);
+    
+    const calculatePlatformSales = (recordsArray) => {
+      if (!Array.isArray(recordsArray)) return {};
+      
+      return recordsArray.reduce((acc, r) => {
+        if (!r) return acc;
+        
+        let key = r.platform || 'Unknown';
+        
+        // Special handling for Myntra distribution
+        if (key.toLowerCase() === 'myntra') {
+          const businessUnit = r.businessUnit || r.source || 'PPMP';
+          key = `myntra_${businessUnit.toUpperCase()}_${r.reportType ? r.reportType.toUpperCase() : 'ORDERS'}`;
+        }
+        
+        if (!acc[key]) {
+          acc[key] = { 
+            sales: 0, 
+            orders: 0, 
+            returns: 0, 
+            refund: 0, 
+            stock: 0, 
+            recordCount: 0,
+            platform: r.platform,
+            businessUnit: r.businessUnit || 'PPMP',
+            reportType: r.reportType || reportType
+          };
+        }
+        
+        acc[key].recordCount += 1;
+        acc[key].sales += r.totalSales || 0;
+        acc[key].orders += r.totalOrders || 0;
+        acc[key].returns += r.totalReturns || 0;
+        acc[key].refund += r.totalRefundAmount || 0;
+        acc[key].stock += r.totalStock || 0;
+        
+        return acc;
+      }, {});
+    };
+    
+    return {
+      yesterday: calculatePlatformSales(yesterdayRecords),
+      dayBefore: calculatePlatformSales(dayBeforeRecords)
+    };
+  }, [safeRecords, reportType]);
+
+  // CORRECTED SKU summary with proper mapping and aggregation
   const skuSummary = useMemo(() => {
-    const acc = {}
-    filteredRecords.forEach(r => {
-      if (!r.skus) return
-      Object.entries(r.skus).forEach(([sku, val]) => {
-        acc[sku] = (acc[sku] || 0) + val
-      })
-    })
+    const localSkuAcc = {};
+    const debugInfo = {};
     
-    // Filter SKUs based on search term
-    const filteredSkus = Object.entries(acc).filter(([sku]) => 
-      sku.toLowerCase().includes(skuSearchTerm.toLowerCase())
-    )
+    if (!Array.isArray(filteredRecords)) {
+      return { local: {}, debug: {} };
+    }
     
-    // Sort by value (descending) and take top 20
-    const sortedSkus = filteredSkus
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 20)
+    console.log('🔄 Processing', filteredRecords.length, 'records for SKU aggregation...');
     
-    return Object.fromEntries(sortedSkus)
-  }, [filteredRecords, skuSearchTerm])
+    filteredRecords.forEach((r, recordIndex) => {
+      if (!r || !r.skus || typeof r.skus !== 'object') {
+        return;
+      }
+      
+      const recordKey = `${r.platform || 'Unknown'}_${r.businessUnit || 'UNKNOWN'}_${r.reportType || reportType}`;
+      
+      Object.entries(r.skus).forEach(([originalSku, val]) => {
+        if (!originalSku || val === null || val === undefined) return;
+        
+        const numericValue = Number(val) || 0;
+        if (numericValue === 0) return; // Skip zero values
+        
+        // Apply SKU mapping to get local SKU
+        const mappingResult = getLocalSkuMapping(originalSku, r.platform?.toLowerCase() || 'local');
+        const localSku = mappingResult.localSku;
+        
+        // Initialize accumulator for this local SKU
+        if (!localSkuAcc[localSku]) {
+          localSkuAcc[localSku] = 0;
+          debugInfo[localSku] = {
+            platforms: {},
+            originalSkus: new Set(),
+            totalValue: 0,
+            recordDetails: [],
+            mapped: mappingResult.mapped
+          };
+        }
+        
+        // Add to total
+        localSkuAcc[localSku] += numericValue;
+        
+        // Debug tracking
+        if (!debugInfo[localSku].platforms[recordKey]) {
+          debugInfo[localSku].platforms[recordKey] = 0;
+        }
+        debugInfo[localSku].platforms[recordKey] += numericValue;
+        debugInfo[localSku].originalSkus.add(originalSku);
+        debugInfo[localSku].totalValue += numericValue;
+        debugInfo[localSku].recordDetails.push({
+          platform: r.platform,
+          businessUnit: r.businessUnit,
+          reportType: r.reportType,
+          originalSku,
+          value: numericValue,
+          recordIndex
+        });
+      });
+    });
 
-  // Get platform icon based on platform name
+    // Filter and sort SKUs based on search term
+    const filteredLocalSkus = Object.entries(localSkuAcc).filter(([sku]) =>
+      sku && sku.toLowerCase().includes((skuSearchTerm || '').toLowerCase())
+    );
+
+    const sortedLocalSkus = filteredLocalSkus
+      .sort(([,a], [,b]) => (Number(b) || 0) - (Number(a) || 0))
+      .slice(0, 20);
+
+    // Enhanced debug logging for searched SKU
+    if (skuSearchTerm && skuSearchTerm.length > 3) {
+      const matchingSku = Object.keys(debugInfo).find(sku => 
+        sku.toLowerCase().includes(skuSearchTerm.toLowerCase())
+      );
+      if (matchingSku) {
+        console.log('🔍 DETAILED SKU BREAKDOWN for:', matchingSku);
+        console.log('═══════════════════════════════════════');
+        console.log('📊 Platform Breakdown:');
+        Object.entries(debugInfo[matchingSku].platforms).forEach(([platform, value]) => {
+          console.log(`   ${platform}: ${formatCurrency(value)}`);
+        });
+        console.log('───────────────────────────────────────');
+        console.log('🔖 Original SKUs mapped:', Array.from(debugInfo[matchingSku].originalSkus));
+        console.log('💰 Final Total:', formatCurrency(debugInfo[matchingSku].totalValue));
+        console.log('🗺️ Was Mapped:', debugInfo[matchingSku].mapped ? 'Yes' : 'No');
+        console.log('📝 Record Details:', debugInfo[matchingSku].recordDetails);
+        console.log('═══════════════════════════════════════');
+      }
+    }
+
+    return {
+      local: Object.fromEntries(sortedLocalSkus),
+      debug: debugInfo
+    };
+  }, [filteredRecords, skuSearchTerm, mappingLoaded, skuMapping, reportType]);
+
+  // Get platform icon
   const getPlatformIcon = (platform) => {
+    if (!platform) return 'fas fa-shopping-cart';
+    
     const icons = {
       myntra: 'fas fa-shopping-bag',
       amazon: 'fab fa-amazon',
@@ -83,591 +373,251 @@ function SummarySection({ records, reportType }) {
       nykaa: 'fas fa-heart',
       ajio: 'fas fa-tshirt',
       delhi_warehouse: 'fas fa-warehouse'
+    };
+    return icons[platform.toLowerCase()] || 'fas fa-shopping-cart';
+  };
+
+  // Get platform display name
+  const getPlatformDisplayName = (key) => {
+    if (!key) return 'Unknown';
+    
+    if (key.includes('myntra_')) {
+      const parts = key.split('_');
+      const businessUnit = parts[1]; // PPMP or SJIT
+      const reportType = parts[2]; // ORDERS, RETURNS, etc.
+      return `Myntra ${businessUnit} - ${reportType}`;
     }
-    return icons[platform.toLowerCase()] || 'fas fa-shopping-cart'
-  }
+    return key.charAt(0).toUpperCase() + key.slice(1);
+  };
 
   return (
-    <>
-      <style jsx>{`
-        .ss_analytics_dashboard_main {
-          margin: 2rem 0;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        
-        .ss_dashboard_header_container {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 1.5rem;
-          padding-bottom: 0.75rem;
-          border-bottom: 2px solid #e9ecef;
-        }
-        
-        .ss_dashboard_title_heading {
-          color: #1a1a1a;
-          font-size: 1.8rem;
-          font-weight: 700;
-          margin: 0;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-        
-        .ss_overview_metrics_grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 1rem;
-          margin: 1.5rem 0;
-          padding: 1.25rem;
-          background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-          border-radius: 8px;
-          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-        }
-        
-        .ss_metric_card_item {
-          text-align: center;
-          padding: 0.75rem 0.5rem;
-          background: white;
-          border-radius: 6px;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-          transition: transform 0.2s ease;
-        }
-        
-        .ss_metric_card_item:hover {
-          transform: translateY(-1px);
-        }
-        
-        .ss_metric_value_display {
-          font-size: 1.6rem;
-          font-weight: 800;
-          color: #1a1a1a;
-          margin-bottom: 0.25rem;
-          line-height: 1.2;
-        }
-        
-        .ss_metric_label_text {
-          font-size: 0.8rem;
-          color: #6c757d;
-          text-transform: uppercase;
-          letter-spacing: 0.6px;
-          font-weight: 600;
-        }
-        
-        .ss_filter_controls_wrapper {
-          display: flex;
-          gap: 2rem;
-          margin: 1.5rem 0;
-          padding: 1rem 1.5rem;
-          background: white;
-          border-radius: 8px;
-          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-          border: 1px solid #e9ecef;
-        }
-        
-        .ss_radio_group_container {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          cursor: pointer;
-          font-weight: 600;
-          font-size: 0.9rem;
-          color: #495057;
-          transition: color 0.2s ease;
-        }
-        
-        .ss_radio_group_container:hover {
-          color: #007bff;
-        }
-        
-        .ss_radio_group_container input[type="radio"] {
-          width: 16px;
-          height: 16px;
-          accent-color: #007bff;
-        }
-        
-        .ss_platform_grid_layout {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-          gap: 1.5rem;
-          margin: 2rem 0;
-        }
-        
-        .ss_platform_card_container {
-          background: white;
-          border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-          overflow: hidden;
-          transition: all 0.3s ease;
-          border: 1px solid #e9ecef;
-        }
-        
-        .ss_platform_card_container:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-        }
-        
-        .ss_platform_header_section {
-          padding: 1.25rem 1.5rem;
-          background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-          color: white;
-          position: relative;
-          overflow: hidden;
-        }
-        
-        .ss_platform_header_section::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: linear-gradient(45deg, rgba(255,255,255,0.08) 0%, transparent 100%);
-        }
-        
-        .ss_platform_name_title {
-          margin: 0;
-          font-size: 1.2rem;
-          font-weight: 700;
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          position: relative;
-          z-index: 1;
-        }
-        
-        .ss_platform_icon_display {
-          font-size: 1.3rem;
-          opacity: 0.9;
-        }
-        
-        .ss_record_counter_badge {
-          font-size: 0.8rem;
-          opacity: 0.85;
-          margin-top: 0.5rem;
-          position: relative;
-          z-index: 1;
-        }
-        
-        .ss_platform_content_area {
-          padding: 1.25rem 1.5rem;
-        }
-        
-        .ss_stats_grid_layout {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-          gap: 1rem;
-        }
-        
-        .ss_stat_box_item {
-          text-align: center;
-          padding: 0.75rem 0.5rem;
-          background: #f8f9fa;
-          border-radius: 6px;
-          transition: background-color 0.2s ease;
-        }
-        
-        .ss_stat_box_item:hover {
-          background: #e9ecef;
-        }
-        
-        .ss_stat_number_value {
-          font-size: 1.3rem;
-          font-weight: 800;
-          color: #1a1a1a;
-          margin-bottom: 0.25rem;
-          line-height: 1.2;
-        }
-        
-        .ss_stat_title_label {
-          font-size: 0.75rem;
-          color: #6c757d;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          font-weight: 600;
-        }
-        
-        .ss_sku_search_wrapper {
-          margin: 1.5rem 0;
-          position: relative;
-        }
-        
-        .ss_search_input_container {
-          position: relative;
-          max-width: 450px;
-        }
-        
-        .ss_search_input_field {
-          width: 100%;
-          padding: 0.75rem 1rem 0.75rem 3rem;
-          border: 2px solid #e9ecef;
-          border-radius: 8px;
-          font-size: 1rem;
-          background: white;
-          transition: all 0.3s ease;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-        }
-        
-        .ss_search_input_field:focus {
-          outline: none;
-          border-color: #007bff;
-          box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.08);
-          transform: translateY(-1px);
-        }
-        
-        .ss_search_icon_element {
-          position: absolute;
-          left: 1rem;
-          top: 50%;
-          transform: translateY(-50%);
-          color: #6c757d;
-          font-size: 1rem;
-        }
-        
-        .ss_sku_section_header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin: 1.5rem 0 1rem 0;
-          padding-bottom: 0.75rem;
-          border-bottom: 1px solid #e9ecef;
-        }
-        
-        .ss_sku_title_heading {
-          color: #1a1a1a;
-          font-size: 1.3rem;
-          font-weight: 700;
-          margin: 0;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-        
-        .ss_sku_counter_info {
-          font-size: 0.8rem;
-          color: #6c757d;
-          font-weight: 500;
-        }
-        
-        .ss_sku_grid_layout {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 1rem;
-          margin: 1.5rem 0;
-        }
-        
-        .ss_sku_item_card {
-          background: white;
-          border: 1px solid #e9ecef;
-          border-radius: 8px;
-          padding: 1rem;
-          text-align: center;
-          transition: all 0.3s ease;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-        }
-        
-        .ss_sku_item_card:hover {
-          border-color: #007bff;
-          box-shadow: 0 2px 8px rgba(0, 123, 255, 0.12);
-          transform: translateY(-1px);
-        }
-        
-        .ss_sku_code_text {
-          font-weight: 700;
-          font-size: 0.85rem;
-          color: #1a1a1a;
-          margin-bottom: 0.75rem;
-          word-break: break-all;
-          line-height: 1.3;
-        }
-        
-        .ss_sku_amount_value {
-          font-size: 1.1rem;
-          font-weight: 800;
-          color: #007bff;
-          line-height: 1.2;
-        }
-        
-        .ss_empty_state_container {
-          text-align: center;
-          padding: 2.5rem 1.5rem;
-          background: #f8f9fa;
-          border-radius: 8px;
-          margin: 1.5rem 0;
-        }
-        
-        .ss_empty_state_icon {
-          font-size: 2.5rem;
-          color: #6c757d;
-          margin-bottom: 0.75rem;
-        }
-        
-        .ss_empty_state_text {
-          color: #6c757d;
-          font-size: 1rem;
-          font-weight: 500;
-        }
-        
-        @media (max-width: 768px) {
-          .ss_platform_grid_layout {
-            grid-template-columns: 1fr;
-          }
+    <div className="summary-section">
+      {/* Header with Controls */}
+      <div className="summary-header">
+        <div className="summary-controls">
+          <DateRangeFilter 
+            onFilterChange={handleFilterChange} 
+            records={safeRecords}
+          />
           
-          .ss_sku_grid_layout {
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-          }
-          
-          .ss_overview_metrics_grid {
-            grid-template-columns: 1fr;
-            padding: 1rem;
-          }
-          
-          .ss_filter_controls_wrapper {
-            flex-direction: column;
-            gap: 1rem;
-            padding: 1rem;
-          }
-          
-          .ss_dashboard_title_heading {
-            font-size: 1.5rem;
-          }
-          
-          .ss_sku_section_header {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 0.75rem;
-          }
-        }
-        
-        @media (max-width: 480px) {
-          .ss_analytics_dashboard_main {
-            margin: 1rem 0;
-          }
-          
-          .ss_platform_header_section {
-            padding: 1rem 1.25rem;
-          }
-          
-          .ss_platform_content_area {
-            padding: 1rem 1.25rem;
-          }
-          
-          .ss_stats_grid_layout {
-            grid-template-columns: 1fr;
-            gap: 0.75rem;
-          }
-        }
-      `}</style>
-
-      <div className="ss_analytics_dashboard_main">
-        <div className="ss_dashboard_header_container">
-          <h2 className="ss_dashboard_title_heading">
-            <i className="fas fa-chart-bar"></i>
-            Analytics Dashboard ({reportType.charAt(0).toUpperCase() + reportType.slice(1)})
-          </h2>
-        </div>
-
-        {/* Overall Summary Stats */}
-        <div className="ss_overview_metrics_grid">
-          <div className="ss_metric_card_item">
-            <div className="ss_metric_value_display">{filteredRecords.length}</div>
-            <div className="ss_metric_label_text">Total Records</div>
+          <div className="control-group">
+            <input
+              type="text"
+              placeholder="Search Local SKUs..."
+              value={skuSearchTerm}
+              onChange={(e) => setSkuSearchTerm(e.target.value)}
+              className="sku-search-input"
+            />
           </div>
-          {reportType === 'orders' && (
-            <>
-              <div className="ss_metric_card_item">
-                <div className="ss_metric_value_display">
-                  {formatNumber(Object.values(platformSummary).reduce((sum, data) => sum + data.orders, 0))}
-                </div>
-                <div className="ss_metric_label_text">Total Orders</div>
-              </div>
-              <div className="ss_metric_card_item">
-                <div className="ss_metric_value_display">
-                  {formatCurrency(Object.values(platformSummary).reduce((sum, data) => sum + data.sales, 0))}
-                </div>
-                <div className="ss_metric_label_text">Total Sales</div>
-              </div>
-            </>
-          )}
-          {reportType === 'returns' && (
-            <>
-              <div className="ss_metric_card_item">
-                <div className="ss_metric_value_display">
-                  {formatNumber(Object.values(platformSummary).reduce((sum, data) => sum + data.returns, 0))}
-                </div>
-                <div className="ss_metric_label_text">Total Returns</div>
-              </div>
-              <div className="ss_metric_card_item">
-                <div className="ss_metric_value_display">
-                  {formatCurrency(Object.values(platformSummary).reduce((sum, data) => sum + data.refund, 0))}
-                </div>
-                <div className="ss_metric_label_text">Total Refund</div>
-              </div>
-            </>
-          )}
-          {reportType === 'inventory' && (
-            <div className="ss_metric_card_item">
-              <div className="ss_metric_value_display">
-                {formatNumber(Object.values(platformSummary).reduce((sum, data) => sum + data.stock, 0))}
-              </div>
-              <div className="ss_metric_label_text">Total Stock</div>
+          
+          <button 
+            onClick={() => setShowDebugInfo(!showDebugInfo)}
+            className={`debug-toggle-btn ${showDebugInfo ? 'active' : ''}`}
+            title="Toggle debug information"
+          >
+            🐛 Debug
+          </button>
+        </div>
+      </div>
+
+      {/* SKU Mapping Status */}
+      {mappingLoaded && (
+        <div className="mapping-status">
+          {skuMapping.size > 0 ? (
+            <div className="mapping-active">
+              ✅ SKU Mapping Active: {skuMapping.size} mappings loaded
+            </div>
+          ) : (
+            <div className="mapping-inactive">
+              ⚠️ SKU Mapping not available - showing original SKUs
             </div>
           )}
         </div>
+      )}
 
-        <DateRangeFilter
-          currentRecords={records}
-          reportType={reportType}
-          onFilterChange={handleFilterChange}
-        />
-
-        <div className="ss_filter_controls_wrapper">
-          <label className="ss_radio_group_container">
-            <input
-              type="radio"
-              name="groupBy"
-              value="platform"
-              checked={groupBy === 'platform'}
-              onChange={() => setGroupBy('platform')}
-            />
-            <i className="fas fa-th-large"></i>
-            Group by Platform
-          </label>
-          <label className="ss_radio_group_container">
-            <input
-              type="radio"
-              name="groupBy"
-              value="sku"
-              checked={groupBy === 'sku'}
-              onChange={() => setGroupBy('sku')}
-            />
-            <i className="fas fa-barcode"></i>
-            Group by SKU (Top 20)
-          </label>
+      {/* Platform Summary with Myntra Distribution */}
+      <div className="platform-summary-section">
+        <h3>🏪 Platform Performance Summary</h3>
+        <div className="platform-grid">
+          {Object.entries(platformSummary).map(([key, data]) => (
+            <div key={key} className="platform-card">
+              <div className="platform-card-header">
+                <i className={getPlatformIcon(data.platform || key.split('_')[0])}></i>
+                <div className="platform-info">
+                  <h4>{getPlatformDisplayName(key)}</h4>
+                  <span className="record-count">{data.recordCount} records</span>
+                </div>
+              </div>
+              
+              <div className="platform-metrics">
+                {reportType === 'orders' && (
+                  <>
+                    <div className="metric">
+                      <span className="metric-label">Total Sales</span>
+                      <span className="metric-value">{formatCurrency(data.sales)}</span>
+                    </div>
+                    <div className="metric">
+                      <span className="metric-label">Total Orders</span>
+                      <span className="metric-value">{formatNumber(data.orders)}</span>
+                    </div>
+                  </>
+                )}
+                
+                {reportType === 'returns' && (
+                  <>
+                    <div className="metric">
+                      <span className="metric-label">Total Returns</span>
+                      <span className="metric-value">{formatNumber(data.returns)}</span>
+                    </div>
+                    <div className="metric">
+                      <span className="metric-label">Refund Amount</span>
+                      <span className="metric-value">{formatCurrency(data.refund)}</span>
+                    </div>
+                  </>
+                )}
+                
+                {reportType === 'inventory' && (
+                  <div className="metric">
+                    <span className="metric-label">Total Stock</span>
+                    <span className="metric-value">{formatNumber(data.stock)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
+      </div>
 
-        {groupBy === 'platform' ? (
-          <div className="ss_platform_grid_layout">
-            {Object.entries(platformSummary).map(([platform, data]) => (
-              <div key={platform} className="ss_platform_card_container">
-                <div className="ss_platform_header_section">
-                  <h4 className="ss_platform_name_title">
-                    <i className={`${getPlatformIcon(platform)} ss_platform_icon_display`}></i>
-                    {platform.charAt(0).toUpperCase() + platform.slice(1)}
-                  </h4>
-                  <div className="ss_record_counter_badge">
-                    {data.recordCount} record{data.recordCount !== 1 ? 's' : ''}
+      {/* Yesterday's Sales Comparison as Tabs */}
+      <div className="yesterday-tabs-section">
+        <div className="yesterday-header">
+          <h3>📈 Daily Sales Comparison - Platform Wise</h3>
+          <div className="date-info">
+            <span className="date-label">Yesterday: {getYesterdayDate()}</span>
+            <span className="date-separator">|</span>
+            <span className="date-label">Day Before: {getDayBeforeYesterdayDate()}</span>
+          </div>
+        </div>
+        
+        {/* Tab Navigation */}
+        <div className="yesterday-tab-nav">
+          <button 
+            className={`tab-btn ${activeYesterdayTab === 'yesterday' ? 'active' : ''}`}
+            onClick={() => setActiveYesterdayTab('yesterday')}
+          >
+            📅 Yesterday ({getYesterdayDate()})
+          </button>
+        </div>
+        
+        {/* Tab Content */}
+        <div className="yesterday-tab-content">
+          <div className="platform-grid">
+            {Object.entries(yesterdayComparison[activeYesterdayTab] || {}).map(([key, data]) => (
+              <div key={key} className="platform-card yesterday-card">
+                <div className="platform-card-header">
+                  <i className={getPlatformIcon(data.platform || key.split('_')[0])}></i>
+                  <div className="platform-info">
+                    <h4>{getPlatformDisplayName(key)}</h4>
+                    <span className="record-count">{data.recordCount} records</span>
                   </div>
                 </div>
-                <div className="ss_platform_content_area">
-                  <div className="ss_stats_grid_layout">
-                    {reportType === 'orders' && (
-                      <>
-                        <div className="ss_stat_box_item">
-                          <div className="ss_stat_number_value">{formatNumber(data.orders)}</div>
-                          <div className="ss_stat_title_label">Orders</div>
-                        </div>
-                        <div className="ss_stat_box_item">
-                          <div className="ss_stat_number_value">{formatCurrency(data.sales)}</div>
-                          <div className="ss_stat_title_label">Sales</div>
-                        </div>
-                        <div className="ss_stat_box_item">
-                          <div className="ss_stat_number_value">
-                            {data.orders > 0 ? formatCurrency(data.sales / data.orders) : '₹0'}
-                          </div>
-                          <div className="ss_stat_title_label">Avg Order</div>
-                        </div>
-                      </>
-                    )}
-                    {reportType === 'returns' && (
-                      <>
-                        <div className="ss_stat_box_item">
-                          <div className="ss_stat_number_value">{formatNumber(data.returns)}</div>
-                          <div className="ss_stat_title_label">Returns</div>
-                        </div>
-                        <div className="ss_stat_box_item">
-                          <div className="ss_stat_number_value">{formatCurrency(data.refund)}</div>
-                          <div className="ss_stat_title_label">Refund</div>
-                        </div>
-                        <div className="ss_stat_box_item">
-                          <div className="ss_stat_number_value">
-                            {data.returns > 0 ? formatCurrency(data.refund / data.returns) : '₹0'}
-                          </div>
-                          <div className="ss_stat_title_label">Avg Refund</div>
-                        </div>
-                      </>
-                    )}
-                    {reportType === 'inventory' && (
-                      <div className="ss_stat_box_item">
-                        <div className="ss_stat_number_value">{formatNumber(data.stock)}</div>
-                        <div className="ss_stat_title_label">Total Stock</div>
-                      </div>
-                    )}
+                
+                <div className="platform-metrics">
+                  <div className="metric">
+                    <span className="metric-label">Sales</span>
+                    <span className="metric-value">{formatCurrency(data.sales)}</span>
                   </div>
+                  
+                  {reportType === 'orders' && (
+                    <div className="metric">
+                      <span className="metric-label">Orders</span>
+                      <span className="metric-value">{formatNumber(data.orders)}</span>
+                    </div>
+                  )}
+                  
+                  {reportType === 'returns' && (
+                    <>
+                      <div className="metric">
+                        <span className="metric-label">Returns</span>
+                        <span className="metric-value">{formatNumber(data.returns)}</span>
+                      </div>
+                      <div className="metric">
+                        <span className="metric-label">Refunds</span>
+                        <span className="metric-value">{formatCurrency(data.refund)}</span>
+                      </div>
+                    </>
+                  )}
+                  
+                  {reportType === 'inventory' && (
+                    <div className="metric">
+                      <span className="metric-label">Stock</span>
+                      <span className="metric-value">{formatNumber(data.stock)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
-        ) : (
-          <div>
-            <div className="ss_sku_search_wrapper">
-              <div className="ss_search_input_container">
-                <i className="fas fa-search ss_search_icon_element"></i>
-                <input
-                  type="text"
-                  className="ss_search_input_field"
-                  placeholder="Search SKUs..."
-                  value={skuSearchTerm}
-                  onChange={(e) => setSkuSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            <div className="ss_sku_section_header">
-              <h5 className="ss_sku_title_heading">
-                <i className="fas fa-barcode"></i>
-                Top SKUs 
-                {skuSearchTerm && (
-                  <span className="text-muted ms-2">
-                    (filtered by "{skuSearchTerm}")
-                  </span>
-                )}
-              </h5>
-              <small className="ss_sku_counter_info">
-                Showing {Object.keys(skuSummary).length} of {
-                  Object.keys(filteredRecords.reduce((acc, r) => ({ ...acc, ...r.skus }), {})).length
-                } total SKUs
-              </small>
-            </div>
+        </div>
+      </div>
 
-            <div className="ss_sku_grid_layout">
-              {Object.entries(skuSummary).map(([sku, value]) => (
-                <div key={sku} className="ss_sku_item_card">
-                  <div className="ss_sku_code_text">{sku}</div>
-                  <div className="ss_sku_amount_value">
-                    {reportType === 'orders' && formatCurrency(value)}
-                    {reportType === 'returns' && formatNumber(value)}
-                    {reportType === 'inventory' && formatNumber(value)}
+      {/* SKU Summary with detailed breakdown and debugging */}
+      <div className="sku-summary-section">
+        <h3>Top SKU Performance Analysis</h3>
+        
+        <div className="sku-content">
+          <div className="sku-grid">
+            {Object.keys(skuSummary.local).length > 0 ? (
+              Object.entries(skuSummary.local).map(([sku, value]) => {
+                const debugData = skuSummary.debug[sku];
+                const isSearched = skuSearchTerm && sku.toLowerCase().includes(skuSearchTerm.toLowerCase());
+                
+                return (
+                  <div key={sku} className={`sku-item local-sku ${isSearched ? 'searched-sku' : ''}`}>
+                    <div className="sku-header">
+                      <span className="sku-code">{sku}</span>
+                      <div className="sku-badges">
+                        {debugData?.mapped && <span className="sku-badge mapped">Mapped</span>}
+                      </div>
+                    </div>
+                    <div className="sku-value">
+                      {reportType === 'orders' ? formatCurrency(value) : formatNumber(value)}
+                    </div>
+                    
+                    {/* Enhanced debug breakdown */}
+                    {(showDebugInfo || isSearched) && debugData && (
+                      <div className="sku-debug-info">
+                        <div className="debug-header">
+                          <span className="debug-title">Platform Breakdown:</span>
+                        </div>
+                        <div className="debug-details">
+                          {Object.entries(debugData.platforms).map(([platform, platformValue]) => (
+                            <div key={platform} className="debug-item">
+                              <span className="debug-platform">{platform}:</span>
+                              <span className="debug-value">
+                                {reportType === 'orders' ? formatCurrency(platformValue) : formatNumber(platformValue)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
-            </div>
-
-            {Object.keys(skuSummary).length === 0 && (
-              <div className="ss_empty_state_container">
-                <div className="ss_empty_state_icon">
-                  <i className="fas fa-search"></i>
-                </div>
-                <div className="ss_empty_state_text">
-                  No SKUs found matching your search criteria.
-                </div>
+                );
+              })
+            ) : (
+              <div className="no-data-message">
+                {skuMapping.size > 0 ? 
+                  'No matching local SKUs found. Try adjusting your search.' : 
+                  'SKU mapping not available. Upload Master_SKU_Mapping.csv file.'
+                }
               </div>
             )}
           </div>
-        )}
+        </div>
       </div>
-    </>
-  )
+    </div>
+  );
 }
 
-export default SummarySection
+export default SummarySection;
