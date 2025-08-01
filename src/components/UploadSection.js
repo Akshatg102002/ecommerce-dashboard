@@ -10,7 +10,6 @@ const generateId = () => {
   });
 };
 
-// API service for MongoDB operations
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
 
 const apiService = {
@@ -24,12 +23,12 @@ const apiService = {
         },
         body: JSON.stringify(recordData),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log('✅ Record saved successfully:', result.message);
       return result.data;
@@ -43,11 +42,11 @@ const apiService = {
     try {
       const queryParams = new URLSearchParams(filters);
       const response = await fetch(`${API_BASE_URL}/records?${queryParams}`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error('❌ API Error:', error);
@@ -63,7 +62,6 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
   const [myntraReportType, setMyntraReportType] = useState('sjit');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Enhanced duplicate check function
   const checkForDuplicateData = (platform, dateRange, reportType, myntraReportType = null) => {
     return currentRecords.some(record => {
       const basicMatch = record.platform === platform && record.dateRange === dateRange;
@@ -111,7 +109,6 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
         throw new Error('Failed to process the file data correctly');
       }
 
-      // Enhanced duplicate check for Myntra
       const isDuplicate = checkForDuplicateData(
         processed.platform,
         processed.dateRange,
@@ -147,13 +144,10 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
         recordCount: data.length
       };
 
-      // Save to MongoDB
       const savedRecord = await apiService.saveRecord(enrichedProcessedData);
-      
-      // Update local state through parent component
+
       await onUpload(savedRecord);
 
-      // Clear the file input
       event.target.value = '';
 
       console.log(`✅ File processed successfully: ${data.length} records from ${file.name}`);
@@ -265,18 +259,23 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
       returnModes: {},
       refundedItems: {},
       rawData: [],
-      reportType: reportType === 'orders' ? myntraReportType : reportType,
+      reportType: platform === 'myntra' ? myntraReportType : reportType,
       styleName: '',
       productName: '',
       skuCategories: {},
-      // Enhanced warehouse tracking for MongoDB
       warehouseSkuData: {},
       skuWarehouseData: {},
-      // Myntra specific return fields
       rtvReturns: 0,
       sjitReturns: 0,
       ppmpReturns: 0
     };
+
+    // Add special flags for Myntra SJIT and PPMP files
+    if (platform === 'myntra' && (myntraReportType === 'sjit' || myntraReportType === 'ppmp')) {
+      processedData.requiresSkuMapping = true;
+      processedData.requiresCategoryMapping = true;
+    }
+
 
     if (reportType === 'orders') {
       const columnConfig = getColumnNames(platform, reportType);
@@ -390,7 +389,6 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
     } else if (reportType === 'inventory') {
       const columnConfig = getColumnNames(platform, reportType);
 
-      // Initialize enhanced warehouse tracking for MongoDB
       processedData.warehouseSkuData = {};
       processedData.skuWarehouseData = {};
 
@@ -410,7 +408,6 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
         const category = columnConfig.categoryColumn ?
           String(getColumnValue(row, columnConfig.categoryColumn) || 'Unknown').trim() : 'Unknown';
 
-        // Enhanced warehouse information handling
         let warehouse = 'Unknown';
         if (platform === 'delhi_warehouse') {
           warehouse = 'Delhi';
@@ -425,25 +422,22 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
         processedData.totalStock += stock;
         processedData.totalFreeStock += freeStock;
 
-        // Enhanced warehouse-SKU tracking for MongoDB
         if (warehouse !== 'Unknown') {
           processedData.warehouses[warehouse] = (processedData.warehouses[warehouse] || 0) + stock;
-          
-          // Create warehouse-SKU mapping for detailed tracking
+
           if (!processedData.warehouseSkuData[warehouse]) {
             processedData.warehouseSkuData[warehouse] = {};
           }
-          
+
           const trackingSku = platform === 'delhi_warehouse' ? childSku : sku;
           if (trackingSku !== 'Unknown') {
-            processedData.warehouseSkuData[warehouse][trackingSku] = 
+            processedData.warehouseSkuData[warehouse][trackingSku] =
               (processedData.warehouseSkuData[warehouse][trackingSku] || 0) + stock;
-            
-            // Create SKU-warehouse reverse mapping
+
             if (!processedData.skuWarehouseData[trackingSku]) {
               processedData.skuWarehouseData[trackingSku] = {};
             }
-            processedData.skuWarehouseData[trackingSku][warehouse] = 
+            processedData.skuWarehouseData[trackingSku][warehouse] =
               (processedData.skuWarehouseData[trackingSku][warehouse] || 0) + stock;
           }
         }
@@ -451,8 +445,7 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
         const skuKey = platform === 'delhi_warehouse' ? childSku : sku;
         if (skuKey !== 'Unknown') {
           processedData.skus[skuKey] = (processedData.skus[skuKey] || 0) + stock;
-          
-          // Store category information for each SKU
+
           if (!processedData.skuCategories) {
             processedData.skuCategories = {};
           }
@@ -467,7 +460,6 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
         processedData.categories[categoryKey] = (processedData.categories[categoryKey] || 0) + stock;
       });
 
-      // Debug logging for warehouse data
       console.log('✅ Inventory processing complete:');
       console.log('📦 Total warehouses:', Object.keys(processedData.warehouses).length);
       console.log('🏪 Warehouse data:', processedData.warehouses);
@@ -478,7 +470,6 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
     return processedData;
   };
 
-  // Helper function to get column value with case-insensitive matching
   const getColumnValue = (row, columnNames) => {
     if (!columnNames || !row) return null;
 
@@ -567,23 +558,28 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
         case 'myntra':
           if (myntraReportType === 'sjit') {
             return {
-              refundAmountColumn: ['refund amount', 'Refund Amount'],
-              skuColumn: ['seller_sku_code', 'Seller SKU Code'],
-              articleTypeColumn: ['article type', 'Article Type'],
-              cityColumn: ['city', 'City'],
+
+              skuColumn: ['myntra_sku_code', 'SKU Code'],
               styleNameColumn: ['style_name', 'Style Name'],
               returnReasonColumn: ['return_reason', 'Return Reason'],
-              returnTypeColumn: ['type', 'Type']
+              returnTypeColumn: ['type', 'Type'],
+
+              requiresSkuMapping: true,
+
+              requiresCategoryMapping: true
             };
           } else if (myntraReportType === 'ppmp') {
             return {
-              refundAmountColumn: ['refund amount', 'Refund Amount'],
-              skuColumn: ['sku_code', 'Seller SKU Code'],
-              articleTypeColumn: ['article type', 'Article Type'],
-              cityColumn: ['city', 'City'],
+
+              skuColumn: ['sku_code', 'SKU Code'],
+
               styleNameColumn: ['style_name', 'Style Name'],
               returnReasonColumn: ['return_reason', 'Return Reason'],
-              returnTypeColumn: ['type', 'Type']
+              returnTypeColumn: ['type', 'Type'],
+
+              requiresSkuMapping: true,
+
+              requiresCategoryMapping: true
             };
           } else if (myntraReportType === 'rtv') {
             return {
@@ -759,206 +755,52 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
   };
 
   return (
-  <div style={{
-    padding: '20px',
-    maxWidth: '100%',
-    margin: '20px auto',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-  }}>
-    {/* Main Grid Container */}
     <div style={{
-      display: 'grid',
-      gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : 'repeat(3, 1fr)',
-      gap: '20px',
-      alignItems: 'start'
+      padding: '20px',
+      maxWidth: '100%',
+      margin: '20px auto',
+      backgroundColor: '#f8f9fa',
+      borderRadius: '8px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
     }}>
-
-      {/* Date Range Section - Grid Item 1 */}
+      { }
       <div style={{
-        backgroundColor: 'white',
-        padding: '20px',
-        borderRadius: '8px',
-        border: '1px solid #e9ecef',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        display: 'grid',
+        gridTemplateColumns: window.innerWidth <= 768 ? '1fr' : 'repeat(3, 1fr)',
+        gap: '20px',
+        alignItems: 'start'
       }}>
-        <h3 style={{
-          margin: '0 0 16px 0',
-          fontSize: '16px',
-          fontWeight: '600',
-          color: '#333',
-          borderBottom: '2px solid #007bff',
-          paddingBottom: '8px'
-        }}>
-          📅 {getDateRangeLabel()}
-        </h3>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px'
-        }}>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px'
-          }}>
-            <label 
-              htmlFor="start-date"
-              style={{
-                fontSize: '13px',
-                fontWeight: '500',
-                color: '#555',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}
-            >
-              Start Date
-            </label>
-            <input
-              id="start-date"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              disabled={isLoading}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '2px solid #e9ecef',
-                borderRadius: '6px',
-                fontSize: '14px',
-                backgroundColor: isLoading ? '#f8f9fa' : 'white',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#007bff'}
-              onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
-            />
-          </div>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px'
-          }}>
-            <label 
-              htmlFor="end-date"
-              style={{
-                fontSize: '13px',
-                fontWeight: '500',
-                color: '#555',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}
-            >
-              End Date
-            </label>
-            <input
-              id="end-date"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              disabled={isLoading}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '2px solid #e9ecef',
-                borderRadius: '6px',
-                fontSize: '14px',
-                backgroundColor: isLoading ? '#f8f9fa' : 'white',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#007bff'}
-              onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
-            />
-          </div>
-        </div>
-      </div>
 
-      {/* Platform Section - Grid Item 2 */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '20px',
-        borderRadius: '8px',
-        border: '1px solid #e9ecef',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-      }}>
-        <h3 style={{
-          margin: '0 0 16px 0',
-          fontSize: '16px',
-          fontWeight: '600',
-          color: '#333',
-          borderBottom: '2px solid #28a745',
-          paddingBottom: '8px'
-        }}>
-          🏪 Platform Settings
-        </h3>
+        { }
         <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px'
+          backgroundColor: 'white',
+          padding: '20px',
+          borderRadius: '8px',
+          border: '1px solid #e9ecef',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
         }}>
+          <h3 style={{
+            margin: '0 0 16px 0',
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#333',
+            borderBottom: '2px solid #007bff',
+            paddingBottom: '8px'
+          }}>
+            📅 {getDateRangeLabel()}
+          </h3>
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '6px'
+            gap: '16px'
           }}>
-            <label 
-              htmlFor="platform-select"
-              style={{
-                fontSize: '13px',
-                fontWeight: '500',
-                color: '#555',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}
-            >
-              Platform
-            </label>
-            <select
-              id="platform-select"
-              value={platform}
-              onChange={(e) => setPlatform(e.target.value)}
-              disabled={isLoading}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: '2px solid #e9ecef',
-                borderRadius: '6px',
-                fontSize: '14px',
-                backgroundColor: isLoading ? '#f8f9fa' : 'white',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                boxSizing: 'border-box',
-                transition: 'border-color 0.2s ease',
-                outline: 'none'
-              }}
-              onFocus={(e) => e.target.style.borderColor = '#28a745'}
-              onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
-            >
-              <option value="myntra">Myntra</option>
-              <option value="nykaa">Nykaa</option>
-              <option value="amazon">Amazon</option>
-              <option value="ajio">AJIO</option>
-              <option value="flipkart">Shopify</option>
-              <option value="delhi_warehouse">Delhi Warehouse</option>
-            </select>
-          </div>
-
-          {/* Myntra Specific Report Type */}
-          {platform === 'myntra' && (reportType === 'orders' || reportType === 'returns') && (
             <div style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px',
-              paddingTop: '12px',
-              borderTop: '1px solid #eee'
+              gap: '6px'
             }}>
-              <label 
-                htmlFor="myntra-type-select"
+              <label
+                htmlFor="start-date"
                 style={{
                   fontSize: '13px',
                   fontWeight: '500',
@@ -967,12 +809,116 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
                   letterSpacing: '0.5px'
                 }}
               >
-                Myntra Report Type
+                Start Date
+              </label>
+              <input
+                id="start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '2px solid #e9ecef',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: isLoading ? '#f8f9fa' : 'white',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.2s ease',
+                  outline: 'none'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#007bff'}
+                onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
+              />
+            </div>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}>
+              <label
+                htmlFor="end-date"
+                style={{
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  color: '#555',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                End Date
+              </label>
+              <input
+                id="end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: '2px solid #e9ecef',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  backgroundColor: isLoading ? '#f8f9fa' : 'white',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.2s ease',
+                  outline: 'none'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#007bff'}
+                onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
+              />
+            </div>
+          </div>
+        </div>
+
+        { }
+        <div style={{
+          backgroundColor: 'white',
+          padding: '20px',
+          borderRadius: '8px',
+          border: '1px solid #e9ecef',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        }}>
+          <h3 style={{
+            margin: '0 0 16px 0',
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#333',
+            borderBottom: '2px solid #28a745',
+            paddingBottom: '8px'
+          }}>
+            🏪 Platform Settings
+          </h3>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
+            }}>
+              <label
+                htmlFor="platform-select"
+                style={{
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  color: '#555',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                Platform
               </label>
               <select
-                id="myntra-type-select"
-                value={myntraReportType}
-                onChange={(e) => setMyntraReportType(e.target.value)}
+                id="platform-select"
+                value={platform}
+                onChange={(e) => setPlatform(e.target.value)}
                 disabled={isLoading}
                 style={{
                   width: '100%',
@@ -989,190 +935,240 @@ function UploadSection({ onUpload, reportType, currentRecords = [] }) {
                 onFocus={(e) => e.target.style.borderColor = '#28a745'}
                 onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
               >
-                <option value="">Select Report Type</option>
-                <option value="sjit">SJIT</option>
-                <option value="ppmp">PPMP</option>
-                <option value="rtv">RTV (Return to Vendor)</option>
+                <option value="myntra">Myntra</option>
+                <option value="nykaa">Nykaa</option>
+                <option value="amazon">Amazon</option>
+                <option value="ajio">AJIO</option>
+                <option value="flipkart">Shopify</option>
+                <option value="delhi_warehouse">Delhi Warehouse</option>
               </select>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* File Upload Section - Grid Item 3 */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '20px',
-        borderRadius: '8px',
-        border: '1px solid #e9ecef',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-      }}>
-        <h3 style={{
-          margin: '0 0 16px 0',
-          fontSize: '16px',
-          fontWeight: '600',
-          color: '#333',
-          borderBottom: '2px solid #dc3545',
-          paddingBottom: '8px'
-        }}>
-          📁 File Upload
-        </h3>
+            { }
+            {platform === 'myntra' && (reportType === 'orders' || reportType === 'returns') && (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+                paddingTop: '12px',
+                borderTop: '1px solid #eee'
+              }}>
+                <label
+                  htmlFor="myntra-type-select"
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    color: '#555',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  Myntra Report Type
+                </label>
+                <select
+                  id="myntra-type-select"
+                  value={myntraReportType}
+                  onChange={(e) => setMyntraReportType(e.target.value)}
+                  disabled={isLoading}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '2px solid #e9ecef',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    backgroundColor: isLoading ? '#f8f9fa' : 'white',
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    boxSizing: 'border-box',
+                    transition: 'border-color 0.2s ease',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#28a745'}
+                  onBlur={(e) => e.target.style.borderColor = '#e9ecef'}
+                >
+                  <option value="">Select Report Type</option>
+                  <option value="sjit">SJIT</option>
+                  <option value="ppmp">PPMP</option>
+                  <option value="rtv">RTV (Return to Vendor)</option>
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
+        { }
         <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px'
+          backgroundColor: 'white',
+          padding: '20px',
+          borderRadius: '8px',
+          border: '1px solid #e9ecef',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
         }}>
-          <input
-            type="file"
-            accept=".csv,.xlsx,.xls,.json"
-            onChange={handleFileUpload}
-            disabled={isUploadDisabled()}
-            id="file-upload"
-            style={{ display: 'none' }}
-          />
-          <button
-            onClick={() => document.getElementById('file-upload').click()}
-            disabled={isUploadDisabled()}
-            style={{
-              width: '100%',
-              padding: '14px 20px',
-              backgroundColor: isUploadDisabled() ? '#6c757d' : '#dc3545',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: isUploadDisabled() ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              transition: 'all 0.2s ease',
-              boxSizing: 'border-box',
-              minHeight: '50px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              boxShadow: isUploadDisabled() ? 'none' : '0 2px 4px rgba(220,53,69,0.2)'
-            }}
-            onMouseOver={(e) => {
-              if (!isUploadDisabled()) {
-                e.target.style.backgroundColor = '#c82333';
-                e.target.style.transform = 'translateY(-1px)';
-                e.target.style.boxShadow = '0 4px 8px rgba(220,53,69,0.3)';
-              }
-            }}
-            onMouseOut={(e) => {
-              if (!isUploadDisabled()) {
-                e.target.style.backgroundColor = '#dc3545';
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = '0 2px 4px rgba(220,53,69,0.2)';
-              }
-            }}
-          >
-            {isLoading ? (
-              <>
+          <h3 style={{
+            margin: '0 0 16px 0',
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#333',
+            borderBottom: '2px solid #dc3545',
+            paddingBottom: '8px'
+          }}>
+            📁 File Upload
+          </h3>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px'
+          }}>
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xls,.json"
+              onChange={handleFileUpload}
+              disabled={isUploadDisabled()}
+              id="file-upload"
+              style={{ display: 'none' }}
+            />
+            <button
+              onClick={() => document.getElementById('file-upload').click()}
+              disabled={isUploadDisabled()}
+              style={{
+                width: '100%',
+                padding: '14px 20px',
+                backgroundColor: isUploadDisabled() ? '#6c757d' : '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: isUploadDisabled() ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                transition: 'all 0.2s ease',
+                boxSizing: 'border-box',
+                minHeight: '50px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                boxShadow: isUploadDisabled() ? 'none' : '0 2px 4px rgba(220,53,69,0.2)'
+              }}
+              onMouseOver={(e) => {
+                if (!isUploadDisabled()) {
+                  e.target.style.backgroundColor = '#c82333';
+                  e.target.style.transform = 'translateY(-1px)';
+                  e.target.style.boxShadow = '0 4px 8px rgba(220,53,69,0.3)';
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!isUploadDisabled()) {
+                  e.target.style.backgroundColor = '#dc3545';
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 2px 4px rgba(220,53,69,0.2)';
+                }
+              }}
+            >
+              {isLoading ? (
+                <>
+                  <div style={{
+                    width: '18px',
+                    height: '18px',
+                    border: '2px solid transparent',
+                    borderTop: '2px solid white',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }}></div>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-cloud-upload-alt" style={{ fontSize: '16px' }}></i>
+                  Choose File
+                </>
+              )}
+            </button>
+
+            { }
+            {isLoading && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                padding: '12px',
+                backgroundColor: '#fff3cd',
+                borderRadius: '6px',
+                border: '1px solid #ffeaa7'
+              }}>
                 <div style={{
-                  width: '18px',
-                  height: '18px',
-                  border: '2px solid transparent',
-                  borderTop: '2px solid white',
+                  width: '16px',
+                  height: '16px',
+                  border: '2px solid #ffc107',
+                  borderTop: '2px solid transparent',
                   borderRadius: '50%',
                   animation: 'spin 1s linear infinite'
                 }}></div>
-                Processing...
-              </>
-            ) : (
-              <>
-                <i className="fas fa-cloud-upload-alt" style={{ fontSize: '16px' }}></i>
-                Choose File
-              </>
+                <p style={{
+                  margin: '0',
+                  fontSize: '12px',
+                  color: '#856404',
+                  fontWeight: '500'
+                }}>
+                  Processing file...
+                </p>
+              </div>
             )}
-          </button>
-
-          {/* Loading Indicator */}
-          {isLoading && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              padding: '12px',
-              backgroundColor: '#fff3cd',
-              borderRadius: '6px',
-              border: '1px solid #ffeaa7'
-            }}>
-              <div style={{
-                width: '16px',
-                height: '16px',
-                border: '2px solid #ffc107',
-                borderTop: '2px solid transparent',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite'
-              }}></div>
-              <p style={{
-                margin: '0',
-                fontSize: '12px',
-                color: '#856404',
-                fontWeight: '500'
-              }}>
-                Processing file...
-              </p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
-    </div>
 
-    {/* File Info - Full Width Below Grid */}
-    <div style={{
-      marginTop: '20px',
-      backgroundColor: '#d1ecf1',
-      padding: '16px 20px',
-      borderRadius: '8px',
-      border: '1px solid #bee5eb'
-    }}>
-      <p style={{
-        margin: '0',
-        fontSize: '14px',
-        color: '#0c5460',
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '10px',
-        lineHeight: '1.5'
+      { }
+      <div style={{
+        marginTop: '20px',
+        backgroundColor: '#d1ecf1',
+        padding: '16px 20px',
+        borderRadius: '8px',
+        border: '1px solid #bee5eb'
       }}>
-        <i 
-          className="fas fa-info-circle" 
-          style={{ 
-            marginTop: '2px',
-            flexShrink: '0',
-            color: '#17a2b8',
-            fontSize: '16px'
-          }}
-        ></i>
-        <span style={{ 
-          wordBreak: 'break-word',
-          fontWeight: '500'
+        <p style={{
+          margin: '0',
+          fontSize: '14px',
+          color: '#0c5460',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '10px',
+          lineHeight: '1.5'
         }}>
-          {getFileInfoText()}
-        </span>
-      </p>
-    </div>
+          <i
+            className="fas fa-info-circle"
+            style={{
+              marginTop: '2px',
+              flexShrink: '0',
+              color: '#17a2b8',
+              fontSize: '16px'
+            }}
+          ></i>
+          <span style={{
+            wordBreak: 'break-word',
+            fontWeight: '500'
+          }}>
+            {getFileInfoText()}
+          </span>
+        </p>
+      </div>
 
-    {/* CSS Animation */}
-    <style jsx>{`
+      { }
+      <style jsx>{`
       @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
       }
-      
+
       @media (max-width: 768px) {
         .upload-section {
           padding: 16px !important;
         }
       }
     `}</style>
-  </div>
-);
+    </div>
+  );
 }
 
 export default UploadSection;

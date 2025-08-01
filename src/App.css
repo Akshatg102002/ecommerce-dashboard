@@ -1924,7 +1924,7 @@ body {
 }
 
 .metric-value {
-  font-size: 24px;
+  font-size: 14px !important;
   font-weight: 700;
   margin: 0 0 4px 0;
 }
@@ -1987,10 +1987,8 @@ body {
 
 .parent-sku-item {
   background: #fff;
-  width: 90%;
   border: 1px solid #dee2e6;
   border-radius: 8px;
-  padding: 4px 10px;
   margin-bottom: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -2497,11 +2495,8 @@ body {
   cursor: pointer;
 }
 
-/* Projections Component Styles */
 .projections-container {
-  min-height: 100vh;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 /* Header Section */
@@ -2513,7 +2508,6 @@ body {
 }
 
 .projections-header-content {
-  max-width: 1280px;
   margin: 0 auto;
   padding: 1.5rem 1rem;
 }
@@ -2538,7 +2532,7 @@ body {
 /* Platform Selector */
 .platform-selector {
   position: relative;
-  min-width: 200px;
+  max-width: 200px;
 }
 
 .platform-selector-label {
@@ -2581,7 +2575,7 @@ body {
 
 /* Main Content */
 .projections-main {
-  max-width: 1280px;
+  max-width: 100%;
   margin: 0 auto;
   padding: 2rem 1rem;
 }
@@ -2989,7 +2983,7 @@ body {
 
 .strategy-header {
   display: flex;
-  justify-content: between;
+  justify-content: space-between;
   align-items: center;
   margin-bottom: 0.5rem;
 }
@@ -3262,6 +3256,10 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
+.projections-container .algorithm-info{
+  margin-bottom: 1rem;
+}
+
 .projections-header {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
@@ -3270,9 +3268,8 @@ body {
 }
 
 .projections-header-content {
-  max-width: 1280px;
   margin: 0 auto;
-  padding: 1.5rem 1rem;
+  padding: 1rem 2rem;
 }
 
 .projections-title {
@@ -3337,9 +3334,9 @@ body {
 }
 
 .projections-main {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
+  max-width: 100%;
+  margin: 0 1rem;
+  padding: 1rem;
 }
 
 .search-controls {

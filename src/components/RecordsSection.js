@@ -1,17 +1,14 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import Papa from 'papaparse';
+import React, { useState, useEffect, useMemo } from 'react';
 import RecordCard from './records/RecordCard';
-import SearchSection from './records/SearchSection';
-import SearchResults from './records/SearchResults';
-import RecordModal from './records/RecordModal';
 
-function RecordsSection({ records, onDelete, reportType }) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRecord, setSelectedRecord] = useState(null);
-  const [showSearchResults, setShowSearchResults] = useState(false);
+function RecordsSection({ records = [], reportType = 'orders', onEdit, onDelete, className = '' }) {
   const [skuMapping, setSkuMapping] = useState(new Map());
   const [mappingLoaded, setMappingLoaded] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
+  const [platformFilter, setPlatformFilter] = useState('all');
 
+  // Load SKU mapping on component mount
   useEffect(() => {
     const loadSkuMapping = async () => {
       try {
@@ -23,65 +20,73 @@ function RecordsSection({ records, onDelete, reportType }) {
         }
 
         const csvText = await response.text();
-
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true,
-          dynamicTyping: false,
-          complete: (results) => {
-            const mapping = new Map();
-
-            results.data.forEach(row => {
-
-              const cleanedRow = {};
-              Object.keys(row).forEach(key => {
-                const cleanKey = key.trim();
-                cleanedRow[cleanKey] = row[key] ? row[key].trim() : '';
-              });
-
-              const localSku = cleanedRow['Local_SKU'] || cleanedRow['Local SKU'] || cleanedRow['local_sku'];
-              const myntraSku = cleanedRow['Myntra_SKU'] || cleanedRow['Myntra SKU'] || cleanedRow['myntra_sku'];
-              const skuId = cleanedRow['SKU_ID'] || cleanedRow['SKU ID'] || cleanedRow['sku_id'];
-              const categories = cleanedRow['Categories'] || cleanedRow['categories'] || cleanedRow['Category'];
-              const nykaaSku = cleanedRow['Nykaa_SKU'] || cleanedRow['Nykaa SKU'] || cleanedRow['nykaa_sku'];
-
-              if (localSku) {
-                const mappingData = {
-                  localSku: localSku,
-                  categories: categories || '',
-                  platforms: {}
-                };
-
-                if (myntraSku) {
-                  mappingData.platforms.myntra = myntraSku;
-                  mapping.set(`myntra_${myntraSku.toLowerCase()}`, mappingData);
-                }
-
-                if (skuId) {
-                  mappingData.platforms.sku_id = skuId;
-                  mapping.set(`sku_id_${skuId.toLowerCase()}`, mappingData);
-                }
-
-                if (nykaaSku) {
-                  mappingData.platforms.nykaa = nykaaSku;
-                  mapping.set(`nykaa_${nykaaSku.toLowerCase()}`, mappingData);
-                }
-
-                mapping.set(`local_${localSku.toLowerCase()}`, mappingData);
-              }
-            });
-
-            setSkuMapping(mapping);
-            setMappingLoaded(true);
-            console.log(`Loaded ${mapping.size} SKU mappings from Master_SKU_Mapping.csv`);
-          },
-          error: (error) => {
-            console.error('Error parsing Master SKU mapping CSV:', error);
-            setMappingLoaded(true);
+        const lines = csvText.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim());
+        
+        const mapping = new Map();
+        
+        for (let i = 1; i < lines.length; i++) {
+          const row = lines[i].split(',').map(cell => cell.trim());
+          if (row.length < headers.length) continue;
+          
+          const rowData = {};
+          headers.forEach((header, index) => {
+            rowData[header] = row[index] || '';
+          });
+          
+          const localSku = rowData['Local_SKU'] || rowData['Local SKU'] || rowData['local_sku'];
+          const myntraSku = rowData['Myntra_SKU'] || rowData['Myntra SKU'] || rowData['myntra_sku'];
+          const amazonSku = rowData['Amazon_SKU'] || rowData['Amazon SKU'] || rowData['amazon_sku'];
+          const flipkartSku = rowData['Flipkart_SKU'] || rowData['Flipkart SKU'] || rowData['flipkart_sku'];
+          const nykaaSku = rowData['Nykaa_SKU'] || rowData['Nykaa SKU'] || rowData['nykaa_sku'];
+          const ajioSku = rowData['Ajio_SKU'] || rowData['Ajio SKU'] || rowData['ajio_sku'];
+          const skuId = rowData['SKU_ID'] || rowData['SKU ID'] || rowData['sku_id'];
+          const categories = rowData['Categories'] || rowData['categories'] || rowData['Category'];
+          
+          if (localSku) {
+            const mappingData = {
+              localSku: localSku,
+              categories: categories || '',
+              platforms: {}
+            };
+            
+            // Map all platform SKUs to the same local SKU
+            if (myntraSku) {
+              mappingData.platforms.myntra = myntraSku;
+              mapping.set(`myntra_${myntraSku.toLowerCase()}`, mappingData);
+            }
+            if (amazonSku) {
+              mappingData.platforms.amazon = amazonSku;
+              mapping.set(`amazon_${amazonSku.toLowerCase()}`, mappingData);
+            }
+            if (flipkartSku) {
+              mappingData.platforms.flipkart = flipkartSku;
+              mapping.set(`flipkart_${flipkartSku.toLowerCase()}`, mappingData);
+            }
+            if (nykaaSku) {
+              mappingData.platforms.nykaa = nykaaSku;
+              mapping.set(`nykaa_${nykaaSku.toLowerCase()}`, mappingData);
+            }
+            if (ajioSku) {
+              mappingData.platforms.ajio = ajioSku;
+              mapping.set(`ajio_${ajioSku.toLowerCase()}`, mappingData);
+            }
+            if (skuId) {
+              mappingData.platforms.sku_id = skuId;
+              mapping.set(`sku_id_${skuId.toLowerCase()}`, mappingData);
+            }
+            
+            // Also map the local SKU to itself
+            mapping.set(`local_${localSku.toLowerCase()}`, mappingData);
+            mapping.set(localSku.toLowerCase(), mappingData);
           }
-        });
+        }
+        
+        setSkuMapping(mapping);
+        setMappingLoaded(true);
+        console.log(`✅ Loaded ${mapping.size} SKU mappings for Records Section`);
       } catch (error) {
-        console.error('Error loading Master SKU mapping:', error);
+        console.error('Error loading SKU mapping:', error);
         setMappingLoaded(true);
       }
     };
@@ -89,609 +94,357 @@ function RecordsSection({ records, onDelete, reportType }) {
     loadSkuMapping();
   }, []);
 
+  // Enhanced SKU mapping helper function
   const getLocalSkuMapping = (platformSku, platform) => {
     if (!platformSku || !skuMapping.size) {
-      return { localSku: platformSku, category: '', originalSku: platformSku };
+      return { localSku: platformSku, category: '', originalSku: platformSku, mapped: false };
     }
-
-    const mappingKey = `${platform}_${platformSku.toLowerCase()}`;
-    const mappingData = skuMapping.get(mappingKey);
-
-    if (mappingData) {
-      return {
-        localSku: mappingData.localSku,
-        category: mappingData.categories,
-        originalSku: platformSku
-      };
+    
+    // Clean the SKU
+    const cleanSku = platformSku.toString().trim();
+    if (!cleanSku) {
+      return { localSku: platformSku, category: '', originalSku: platformSku, mapped: false };
     }
-
-    return { localSku: platformSku, category: '', originalSku: platformSku };
-  };
-
-  const enhanceRecordsWithMapping = (records) => {
-    if (!mappingLoaded || !skuMapping.size) return records;
-
-    return records.map(record => {
-      const platformName = record.platform.toLowerCase();
-
-      const standardizedRecord = {
-        ...record,
-
-        totalOrders: record.totalOrders || 0,
-        totalSales: record.totalSales || record.totalRevenue || 0,
-        totalReturns: record.totalReturns || 0,
-        totalRefundAmount: record.totalRefundAmount || 0,
-        totalStock: record.totalStock || 0,
-      };
-
-      if (record.skus && typeof record.skus === 'object') {
-        const enhancedSkus = {};
-        const enhancedParentSkus = {};
-        const skuCategories = {};
-        const originalSkus = { ...record.skus };
-
-        Object.entries(record.skus).forEach(([sku, value]) => {
-          let mappingResult;
-
-          switch (platformName) {
-            case 'myntra':
-              mappingResult = getLocalSkuMapping(sku, 'myntra');
-              break;
-            case 'nykaa':
-              mappingResult = getLocalSkuMapping(sku, 'nykaa');
-              break;
-            case 'delhi_warehouse':
-              mappingResult = getLocalSkuMapping(sku, 'sku_id');
-              break;
-            default:
-              mappingResult = getLocalSkuMapping(sku, 'local');
-              break;
-          }
-
-          const { localSku, category } = mappingResult;
-
-          if (enhancedSkus[localSku]) {
-            enhancedSkus[localSku] += Number(value) || 0;
-          } else {
-            enhancedSkus[localSku] = Number(value) || 0;
-          }
-
-          if (category) {
-            skuCategories[localSku] = category;
-          }
-        });
-
-        if (record.parentSkus && typeof record.parentSkus === 'object') {
-          Object.entries(record.parentSkus).forEach(([parentSku, value]) => {
-            let mappingResult;
-
-            switch (platformName) {
-              case 'myntra':
-                mappingResult = getLocalSkuMapping(parentSku, 'myntra');
-                break;
-              case 'nykaa':
-                mappingResult = getLocalSkuMapping(parentSku, 'nykaa');
-                break;
-              default:
-                mappingResult = getLocalSkuMapping(parentSku, 'local');
-                break;
-            }
-
-            const { localSku, category } = mappingResult;
-
-            if (enhancedParentSkus[localSku]) {
-              enhancedParentSkus[localSku] += Number(value) || 0;
-            } else {
-              enhancedParentSkus[localSku] = Number(value) || 0;
-            }
-
-            if (category) {
-              skuCategories[localSku] = category;
-            }
-          });
-        }
-
-        const categoriesFromSkus = {};
-        Object.entries(skuCategories).forEach(([sku, category]) => {
-          if (category) {
-            const skuValue = enhancedSkus[sku] || enhancedParentSkus[sku] || 0;
-            if (categoriesFromSkus[category]) {
-              categoriesFromSkus[category] += skuValue;
-            } else {
-              categoriesFromSkus[category] = skuValue;
-            }
-          }
-        });
-
-        const mergedCategories = { ...record.categories };
-        Object.entries(categoriesFromSkus).forEach(([category, value]) => {
-          if (mergedCategories[category]) {
-            mergedCategories[category] += value;
-          } else {
-            mergedCategories[category] = value;
-          }
-        });
-
+    
+    // Try different mapping keys in order of specificity
+    const mappingKeys = [
+      `${platform}_${cleanSku.toLowerCase()}`,
+      `local_${cleanSku.toLowerCase()}`,
+      cleanSku.toLowerCase()
+    ];
+    
+    for (const mappingKey of mappingKeys) {
+      const mappingData = skuMapping.get(mappingKey);
+      if (mappingData) {
         return {
-          ...standardizedRecord,
-          skus: enhancedSkus,
-          parentSkus: Object.keys(enhancedParentSkus).length > 0 ? enhancedParentSkus : record.parentSkus,
-          originalSkus: originalSkus, 
-          categories: Object.keys(mergedCategories).length > 0 ? mergedCategories : record.categories,
-          skuCategories: skuCategories, 
+          localSku: mappingData.localSku,
+          category: mappingData.categories,
+          originalSku: platformSku,
+          mapped: true
         };
       }
-
-      return standardizedRecord;
-    });
-  };
-
-  const enhancedRecords = useMemo(() => {
-    return enhanceRecordsWithMapping(records);
-  }, [records, skuMapping, mappingLoaded]);
-
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this record?')) {
-      onDelete(id);
     }
+    
+    // If no mapping found, return original SKU
+    return { localSku: platformSku, category: '', originalSku: platformSku, mapped: false };
   };
 
-  const handleDownload = (record) => {
-    const data = [record];
+  // CORRECTED: Enhanced function to process records with proper aggregation across multiple records
+const enhanceRecordsWithMapping = (records) => {
+  if (!mappingLoaded || !skuMapping.size) return records;
 
-    const headers = [
-      { label: 'Platform', key: 'platform' },
-      { label: 'Date Range', key: 'dateRange' },
-      { label: 'Report Type', key: 'reportType' },
-      { label: 'Product/Style Name', key: record.platform === 'myntra' ? 'styleName' : 'productName' },
-      { label: 'Total Orders', key: 'totalOrders' },
-      { label: 'Total Sales', key: 'totalSales' },
-      { label: 'Total Returns', key: 'totalReturns' },
-      { label: 'Total Refund Amount', key: 'totalRefundAmount' },
-      { label: 'Total Stock', key: 'totalStock' },
-      { label: 'SKU Count', key: 'skuCount' }
-    ];
-
-    const enhancedRecord = {
+  return records.map(record => {
+    const platformName = record.platform.toLowerCase();
+    const standardizedRecord = {
       ...record,
-      skuCount: record.skus ? Object.keys(record.skus).length : 0
+      totalOrders: record.totalOrders || 0,
+      totalSales: record.totalSales || record.totalRevenue || 0,
+      totalReturns: record.totalReturns || 0,
+      totalRefundAmount: record.totalRefundAmount || 0,
+      totalStock: record.totalStock || 0,
     };
 
-    const csvLink = document.createElement('a');
-    const csvData = new Blob([Papa.unparse({ 
-      fields: headers.map(header => header.label), 
-      data: [enhancedRecord]
-    })], { type: 'text/csv;charset=utf-8;' });
+    // CRITICAL FIX: Process raw order line items instead of pre-aggregated SKUs
+    if (record.rawOrderLines && Array.isArray(record.rawOrderLines)) {
+      const enhancedSkus = {};
+      const enhancedParentSkus = {};
+      const skuCategories = {};
+      const skuCounts = {};
+      const parentSkuCounts = {};
 
-    csvLink.href = URL.createObjectURL(csvData);
-    csvLink.target = '_blank';
-    csvLink.download = `${record.platform}_${record.dateRange}_${record.reportType || reportType}.csv`;
-    csvLink.click();
-  };
-
-  const formatCurrency = (amount) => {
-    return `₹${Number(amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
-  };
-
-  const formatNumber = (num) => {
-    return Number(num).toLocaleString('en-IN');
-  };
-
-  const getStockStatus = (stock) => {
-    if (stock === 0) return { status: 'Out of Stock', className: 'critical' };
-    if (stock < 50) return { status: 'Low Stock', className: 'warning' };
-    if (stock < 100) return { status: 'Medium Stock', className: 'medium' };
-    return { status: 'Good Stock', className: 'good' };
-  };
-
-  const getTopItems = (items, limit = 3) => {
-    if (!items || typeof items !== 'object') return [];
-
-    return Object.entries(items)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, limit);
-  };
-
-  const formatDateDisplay = (record) => {
-    if (record.dateRange) {
-      return record.dateRange;
-    }
-
-    if (record.startDate && record.endDate) {
-      if (record.startDate === record.endDate) {
-        return record.startDate;
-      }
-      return `${record.startDate} to ${record.endDate}`;
-    }
-
-    if (record.date) {
-      return new Date(record.date).toLocaleDateString('en-IN');
-    }
-
-    return 'Date not available';
-  };
-
-const searchResults = useMemo(() => {
-  if (!searchTerm.trim()) return [];
-
-  const term = searchTerm.toLowerCase();
-  const results = [];
-
-  if (reportType === 'orders') {
-    const platformData = {};
-
-    enhancedRecords.forEach(record => {
-      const platform = record.platform?.toLowerCase();
-
-      if (record.platform?.toLowerCase().includes(term) || 
-          record.productName?.toLowerCase().includes(term) || 
-          record.styleName?.toLowerCase().includes(term)) {
-
-        if (!platformData[platform]) {
-          platformData[platform] = {
-            platform: record.platform,
-            totalOrders: 0,
-            totalSales: 0,
-            records: []
-          };
-        }
-
-        platformData[platform].totalOrders += record.totalOrders || 0;
-        platformData[platform].totalSales += record.totalSales || 0;
-        platformData[platform].records.push(record);
-      }
-
-      if (record.skus && typeof record.skus === 'object') {
-        Object.entries(record.skus).forEach(([sku, sales]) => {
-          if (sku.toLowerCase().includes(term)) {
-            if (!platformData[platform]) {
-              platformData[platform] = {
-                platform: record.platform,
-                totalOrders: 0,
-                totalSales: 0,
-                records: []
-              };
+      // Process each order line item separately
+      record.rawOrderLines.forEach((orderLine) => {
+        // Skip invalid orders
+        const shouldSkipOrder = () => {
+          if (platformName === 'myntra' && (reportType === 'orders' || record.reportType === 'orders')) {
+            const orderStatus = orderLine.orderStatus || orderLine.status || orderLine.order_status;
+            const invalidStatuses = ['WP', 'CANCELLED', 'CANCELED', 'RETURNED', 'REFUNDED', 'CA', 'RT'];
+            if (orderStatus && invalidStatuses.includes(orderStatus.toUpperCase())) {
+              return true;
             }
-
-            const category = record.skuCategories && record.skuCategories[sku] ? record.skuCategories[sku] : '';
-            results.push({
-              type: 'orderSku',
-              record,
-              matchType: 'sku',
-              matchText: sku,
-              sales: sales,
-              sku: sku,
-              category: category,
-              platform: record.platform,
-              priority: 1
-            });
           }
-        });
-      }
+          return false;
+        };
 
-      if (record.categories && typeof record.categories === 'object') {
-        Object.entries(record.categories).forEach(([category, sales]) => {
-          if (category.toLowerCase().includes(term)) {
-            results.push({
-              type: 'orderCategory',
-              record,
-              matchType: 'category',
-              matchText: category,
-              sales: sales,
-              category: category,
-              platform: record.platform,
-              priority: 2
-            });
-          }
-        });
-      }
+        if (shouldSkipOrder()) return;
 
-      if (record.cities && typeof record.cities === 'object') {
-        Object.entries(record.cities).forEach(([city, sales]) => {
-          if (city.toLowerCase().includes(term)) {
-            results.push({
-              type: 'orderCity',
-              record,
-              matchType: 'city',
-              matchText: city,
-              sales: sales,
-              city: city,
-              platform: record.platform,
-              priority: 3
-            });
-          }
-        });
-      }
-    });
+        const sku = orderLine.sku || orderLine.SKU;
+        const value = Number(orderLine.finalAmount || orderLine.value || orderLine.sales || 0);
+        const quantity = Number(orderLine.quantity || 1); // Each order line = 1 piece unless specified
 
-    Object.values(platformData).forEach(data => {
-      if (data.records.length > 0) {
-        results.unshift({
-          type: 'platformOrdersAggregate',
-          matchType: 'platform',
-          matchText: `${data.platform} - Total Sales`,
-          platform: data.platform,
-          totalOrders: data.totalOrders,
-          totalSales: data.totalSales,
-          recordCount: data.records.length,
-          priority: 0
-        });
-      }
-    });
-  }
+        if (!sku || !value) return;
 
-  else if (reportType === 'returns') {
-    const platformData = {};
-
-    enhancedRecords.forEach(record => {
-      const platform = record.platform?.toLowerCase();
-
-      if (record.platform?.toLowerCase().includes(term) || 
-          record.productName?.toLowerCase().includes(term) || 
-          record.styleName?.toLowerCase().includes(term)) {
-
-        if (!platformData[platform]) {
-          platformData[platform] = {
-            platform: record.platform,
-            totalReturns: 0,
-            totalRefundAmount: 0,
-            sjitReturns: 0,
-            ppmpReturns: 0,
-            rtvReturns: 0,
-            records: []
-          };
+        // Apply SKU mapping
+        let mappingResult;
+        switch (platformName) {
+          case 'myntra':
+            mappingResult = getLocalSkuMapping(sku, 'myntra');
+            break;
+          case 'nykaa':
+            mappingResult = getLocalSkuMapping(sku, 'nykaa');
+            break;
+          case 'delhi_warehouse':
+            mappingResult = getLocalSkuMapping(sku, 'sku_id');
+            break;
+          default:
+            mappingResult = getLocalSkuMapping(sku, 'local');
+            break;
         }
 
-        platformData[platform].totalReturns += record.totalReturns || 0;
-        platformData[platform].totalRefundAmount += record.totalRefundAmount || 0;
+        const { localSku, category } = mappingResult;
 
-        if (record.platform?.toLowerCase() === 'myntra') {
-          platformData[platform].sjitReturns += record.sjitReturns || 0;
-          platformData[platform].ppmpReturns += record.ppmpReturns || 0;
-          platformData[platform].rtvReturns += record.rtvReturns || 0;
+        // Aggregate values and counts
+        enhancedSkus[localSku] = (enhancedSkus[localSku] || 0) + value;
+        skuCounts[localSku] = (skuCounts[localSku] || 0) + quantity;
+
+        if (category) {
+          skuCategories[localSku] = category;
         }
+      });
 
-        platformData[platform].records.push(record);
-      }
+      // Calculate totals
+      const totalSkuCount = Object.values(skuCounts).reduce((sum, count) => sum + count, 0);
 
-      if (record.returnReasons && typeof record.returnReasons === 'object') {
-        Object.entries(record.returnReasons).forEach(([reason, count]) => {
-          if (reason.toLowerCase().includes(term)) {
-            results.push({
-              type: 'returnReason',
-              record,
-              matchType: 'returnReason',
-              matchText: reason,
-              count: count,
-              reason: reason,
-              platform: record.platform,
-              priority: 1
-            });
-          }
-        });
-      }
-
-      if (record.returnTypes && typeof record.returnTypes === 'object') {
-        Object.entries(record.returnTypes).forEach(([type, count]) => {
-          if (type.toLowerCase().includes(term)) {
-            results.push({
-              type: 'returnType',
-              record,
-              matchType: 'returnType',
-              matchText: type,
-              count: count,
-              returnType: type,
-              platform: record.platform,
-              priority: 2
-            });
-          }
-        });
-      }
-
-      if (record.skus && typeof record.skus === 'object') {
-        Object.entries(record.skus).forEach(([sku, returnCount]) => {
-          if (sku.toLowerCase().includes(term)) {
-            const category = record.skuCategories && record.skuCategories[sku] ? record.skuCategories[sku] : '';
-            results.push({
-              type: 'returnSku',
-              record,
-              matchType: 'sku',
-              matchText: sku,
-              returnCount: returnCount,
-              sku: sku,
-              category: category,
-              platform: record.platform,
-              priority: 3
-            });
-          }
-        });
-      }
-
-      if (record.categories && typeof record.categories === 'object') {
-        Object.entries(record.categories).forEach(([category, refundAmount]) => {
-          if (category.toLowerCase().includes(term)) {
-            results.push({
-              type: 'returnCategory',
-              record,
-              matchType: 'category',
-              matchText: category,
-              refundAmount: refundAmount,
-              category: category,
-              platform: record.platform,
-              priority: 4
-            });
-          }
-        });
-      }
-    });
-
-    Object.values(platformData).forEach(data => {
-      if (data.records.length > 0) {
-        results.unshift({
-          type: 'platformReturnsAggregate',
-          matchType: 'platform',
-          matchText: `${data.platform} - Total Returns`,
-          platform: data.platform,
-          totalReturns: data.totalReturns,
-          totalRefundAmount: data.totalRefundAmount,
-          sjitReturns: data.sjitReturns,
-          ppmpReturns: data.ppmpReturns,
-          rtvReturns: data.rtvReturns,
-          recordCount: data.records.length,
-          priority: 0
-        });
-      }
-    });
-  }
-
-  else if (reportType === 'inventory') {
-    enhancedRecords.forEach(record => {
-
-      if (record.platform?.toLowerCase().includes(term) || 
-          record.productName?.toLowerCase().includes(term) || 
-          record.styleName?.toLowerCase().includes(term)) {
-        results.push({
-          type: 'record',
-          record,
-          matchType: 'basic',
-          matchText: record.platform || record.productName || record.styleName
-        });
-      }
-
-      if (record.parentSkus && typeof record.parentSkus === 'object') {
-        Object.entries(record.parentSkus).forEach(([parentSku, stock]) => {
-          if (parentSku.toLowerCase().includes(term)) {
-            const category = record.skuCategories && record.skuCategories[parentSku] ? record.skuCategories[parentSku] : '';
-            results.push({
-              type: 'parentSku',
-              record,
-              matchType: 'parentSku',
-              matchText: parentSku,
-              stock: stock,
-              parentSku: parentSku,
-              category: category,
-              priority: 1
-            });
-          }
-        });
-      }
-
-      if (record.skus && typeof record.skus === 'object') {
-        Object.entries(record.skus).forEach(([sku, stock]) => {
-          if (sku.toLowerCase().includes(term)) {
-            const category = record.skuCategories && record.skuCategories[sku] ? record.skuCategories[sku] : '';
-            const isOriginalSku = record.originalSkus && record.originalSkus[sku];
-            results.push({
-              type: 'sku',
-              record,
-              matchType: 'sku',
-              matchText: sku,
-              stock: stock,
-              sku: sku,
-              category: category,
-              priority: 2,
-              isMapped: !isOriginalSku && skuMapping.size > 0
-            });
-          }
-        });
-      }
-
-    });
-  }
-
-  return results.sort((a, b) => {
-    if (a.priority !== b.priority) {
-      return (a.priority || 5) - (b.priority || 5);
+      return {
+        ...standardizedRecord,
+        skus: enhancedSkus,
+        parentSkus: enhancedParentSkus,
+        skuCategories: skuCategories,
+        skuCounts: skuCounts,
+        parentSkuCounts: parentSkuCounts,
+        totalSkuCount: totalSkuCount,
+        totalParentSkuCount: 0
+      };
     }
 
-    const aValue = a.sales || a.totalSales || a.returnCount || a.totalReturns || a.stock || 0;
-    const bValue = b.sales || b.totalSales || b.returnCount || b.totalReturns || b.stock || 0;
-    return bValue - aValue;
+    // ALTERNATIVE FIX: If you don't have rawOrderLines, but SKUs appear multiple times in the same record
+    else if (record.skus && typeof record.skus === 'object') {
+      const enhancedSkus = {};
+      const skuCounts = {};
+
+      // Check if your record structure has multiple entries for the same SKU
+      // This would happen if your CSV has multiple rows for the same SKU
+      
+      // Process each SKU entry (this assumes each entry = 1 piece)
+      Object.entries(record.skus).forEach(([sku, value]) => {
+        // Skip invalid entries
+        if (!sku || sku.trim() === '' || sku === 'Unknown' || sku === 'N/A') return;
+        
+        const numericValue = Number(value) || 0;
+
+        // Skip cancelled orders
+        const shouldSkipOrder = () => {
+          if (platformName === 'myntra' && (reportType === 'orders' || record.reportType === 'orders')) {
+            const orderStatus = record.orderStatus || record.status || record.order_status;
+            const invalidStatuses = ['WP', 'CANCELLED', 'CANCELED', 'RETURNED', 'REFUNDED', 'CA', 'RT'];
+            if (orderStatus && invalidStatuses.includes(orderStatus.toUpperCase())) {
+              return true;
+            }
+          }
+          return false;
+        };
+
+        if (shouldSkipOrder()) return;
+
+        // Apply SKU mapping
+        let mappingResult;
+        switch (platformName) {
+          case 'myntra':
+            mappingResult = getLocalSkuMapping(sku, 'myntra');
+            break;
+          case 'nykaa':
+            mappingResult = getLocalSkuMapping(sku, 'nykaa');
+            break;
+          default:
+            mappingResult = getLocalSkuMapping(sku, 'local');
+            break;
+        }
+
+        const { localSku } = mappingResult;
+
+        // CRITICAL: Each entry in the skus object represents ONE piece sold
+        enhancedSkus[localSku] = (enhancedSkus[localSku] || 0) + numericValue;
+        skuCounts[localSku] = (skuCounts[localSku] || 0) + 1; // Each entry = 1 piece
+      });
+
+      return {
+        ...standardizedRecord,
+        skus: enhancedSkus,
+        skuCounts: skuCounts,
+        totalSkuCount: Object.values(skuCounts).reduce((sum, count) => sum + count, 0)
+      };
+    }
+
+    return standardizedRecord;
   });
-}, [searchTerm, enhancedRecords, skuMapping, reportType]);
+};
 
-  const handleSearch = (e) => {
-    if (e) e.preventDefault();
-    setShowSearchResults(true);
-  };
 
-  const handleClearSearch = () => {
-    setSearchTerm('');
-    setShowSearchResults(false);
-    setSelectedRecord(null);
-  };
+  // Apply enhancements to records
+  const enhancedRecords = useMemo(() => {
+    return enhanceRecordsWithMapping(records);
+  }, [records, mappingLoaded, skuMapping]);
+
+  // Filter and search functionality
+  const filteredRecords = useMemo(() => {
+    let filtered = enhancedRecords;
+
+    // Platform filter
+    if (platformFilter !== 'all') {
+      filtered = filtered.filter(record => 
+        record.platform?.toLowerCase() === platformFilter.toLowerCase()
+      );
+    }
+
+    // Search filter
+    if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      filtered = filtered.filter(record => {
+        // Search in platform, business unit, and SKUs
+        const platformMatch = record.platform?.toLowerCase().includes(lowerSearchTerm);
+        const businessUnitMatch = record.businessUnit?.toLowerCase().includes(lowerSearchTerm);
+        
+        // Search in SKUs
+        const skuMatch = record.skus && Object.keys(record.skus).some(sku => 
+          sku.toLowerCase().includes(lowerSearchTerm)
+        );
+        
+        return platformMatch || businessUnitMatch || skuMatch;
+      });
+    }
+
+    // Sorting
+    switch (sortBy) {
+      case 'newest':
+        filtered.sort((a, b) => new Date(b.uploadedAt || 0) - new Date(a.uploadedAt || 0));
+        break;
+      case 'oldest':
+        filtered.sort((a, b) => new Date(a.uploadedAt || 0) - new Date(b.uploadedAt || 0));
+        break;
+      case 'sales-high':
+        filtered.sort((a, b) => (b.totalSales || 0) - (a.totalSales || 0));
+        break;
+      case 'sales-low':
+        filtered.sort((a, b) => (a.totalSales || 0) - (b.totalSales || 0));
+        break;
+      case 'platform':
+        filtered.sort((a, b) => (a.platform || '').localeCompare(b.platform || ''));
+        break;
+      default:
+        break;
+    }
+
+    return filtered;
+  }, [enhancedRecords, searchTerm, sortBy, platformFilter]);
+
+  // Get unique platforms for filter
+  const uniquePlatforms = useMemo(() => {
+    const platforms = records.map(record => record.platform).filter(Boolean);
+    return [...new Set(platforms)];
+  }, [records]);
+
+  if (!Array.isArray(records) || records.length === 0) {
+    return (
+      <div className={`records-section ${className}`}>
+        <div className="no-records">
+          <div className="no-records-icon">📊</div>
+          <h3>No Records Found</h3>
+          <p>Upload some data files to see records here.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="records-section">
-      <div className="records-header">
-        <h2>Historical Records - {reportType.charAt(0).toUpperCase() + reportType.slice(1)}</h2>
-
-        {}
-        <SearchSection 
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          onSearch={handleSearch}
-          onClearSearch={handleClearSearch}
-          showSearchResults={showSearchResults}
-          reportType={reportType}
-          skuMapping={skuMapping}
-          mappingLoaded={mappingLoaded}
-        />
-
-        {}
-        {showSearchResults && (
-          <SearchResults 
-            searchResults={searchResults}
-            searchTerm={searchTerm}
-            reportType={reportType}
-            getLocalSkuMapping={getLocalSkuMapping}
-            formatNumber={formatNumber}
-            formatCurrency={formatCurrency}
-            formatDateDisplay={formatDateDisplay}
-          />
-        )}
-
-        {}
-        <RecordModal 
-          selectedRecord={selectedRecord}
-          reportType={reportType}
-          onClose={() => setSelectedRecord(null)}
-          onDelete={handleDelete}
-          onDownload={handleDownload}
-          formatNumber={formatNumber}
-          formatCurrency={formatCurrency}
-          getTopItems={getTopItems}
-          getStockStatus={getStockStatus}
-          formatDateDisplay={formatDateDisplay}
-        />
-      </div>
-
-      {}
-      {!showSearchResults && (
-        <div className="records-grid">
-          {enhancedRecords.length === 0 ? (
-            <div className="no-records">
-              <p>No records found for {reportType}.</p>
-              <p>Upload some files to see historical data here.</p>
+    <div className={`records-section ${className}`}>
+      {/* SKU Mapping Status */}
+      {mappingLoaded && (
+        <div className="mapping-status">
+          {skuMapping.size > 0 ? (
+            <div className="mapping-active">
+              ✅ SKU Mapping Active: {skuMapping.size} mappings loaded
             </div>
           ) : (
-            enhancedRecords.map(record => (
-              <RecordCard 
-                key={record.id}
-                record={record}
-                reportType={reportType}
-                onDelete={handleDelete}
-                onDownload={handleDownload}
-                getLocalSkuMapping={getLocalSkuMapping}
-                formatNumber={formatNumber}
-                formatCurrency={formatCurrency}
-                getTopItems={getTopItems}
-                getStockStatus={getStockStatus}
-                formatDateDisplay={formatDateDisplay}
-                standardizedView={true} 
-              />
-            ))
+            <div className="mapping-inactive">
+              ⚠️ SKU Mapping not available - showing original SKUs
+            </div>
           )}
+        </div>
+      )}
+
+      {/* Controls */}
+      <div className="records-controls">
+        <div className="search-container">
+          <input
+            type="text"
+            placeholder="Search records, platforms, or SKUs..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
+        </div>
+        
+        <div className="filter-container">
+          <select
+            value={platformFilter}
+            onChange={(e) => setPlatformFilter(e.target.value)}
+            className="platform-filter"
+          >
+            <option value="all">All Platforms</option>
+            {uniquePlatforms.map(platform => (
+              <option key={platform} value={platform}>
+                {platform.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="sort-container">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="sort-select"
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="sales-high">Highest Sales</option>
+            <option value="sales-low">Lowest Sales</option>
+            <option value="platform">Platform A-Z</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Records Count */}
+      <div className="records-summary">
+        <span className="records-count">
+          Showing {filteredRecords.length} of {records.length} records
+        </span>
+        {searchTerm && (
+          <span className="search-results">
+            for "{searchTerm}"
+          </span>
+        )}
+      </div>
+
+      {/* Records Grid */}
+      <div className="records-grid">
+        {filteredRecords.map(record => (
+          <RecordCard
+            key={record.id}
+            record={record}
+            reportType={reportType}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            skuMapping={skuMapping}
+          />
+        ))}
+      </div>
+
+      {filteredRecords.length === 0 && (
+        <div className="no-results">
+          <div className="no-results-icon">🔍</div>
+          <h3>No Results Found</h3>
+          <p>Try adjusting your search or filter criteria.</p>
         </div>
       )}
     </div>
