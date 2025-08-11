@@ -300,7 +300,7 @@ const enhanceRecordsWithMapping = (records) => {
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(record => {
-        // Search in platform, business unit, and SKUs
+        // Search in platform, b  usiness unit, and SKUs
         const platformMatch = record.platform?.toLowerCase().includes(lowerSearchTerm);
         const businessUnitMatch = record.businessUnit?.toLowerCase().includes(lowerSearchTerm);
         

@@ -8,6 +8,7 @@ import ExportSection from './components/ExportSection';
 import DateRangeFilter from './components/DateRangeFilter';
 import AIInsightsSection from './components/AIInsightsSection';
 import Projections from './components/Projections';
+import ProjectionsComponent from './components/ProjectionsComponent';
 import { DatabaseProvider, useDatabaseContext } from './contexts/DatabaseContext';
 import './App.css';
 
@@ -721,7 +722,7 @@ function AppContent() {
         <AIInsightsSection records={filteredRecords} reportType={reportType} />
       )} */}
 
-      <Projections />
+      <ProjectionsComponent />
 
 
       {/* <ExportSection records={filteredRecords} reportType={reportType} /> */}
